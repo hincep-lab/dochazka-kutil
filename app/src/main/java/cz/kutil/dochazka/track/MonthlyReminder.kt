@@ -22,9 +22,10 @@ import java.util.concurrent.TimeUnit
 class MonthlyReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
         val ctx = applicationContext
-        if (!AppPrefs.reminderEnabled(ctx)) return Result.success()
         val now = ZonedDateTime.now(PRAGUE)
         if (now.hour < 7) return Result.success()
+        backupReminder(ctx, now)
+        if (!AppPrefs.reminderEnabled(ctx)) return Result.success()
         val previous = YearMonth.from(now).minusMonths(1)
         if (AppPrefs.lastReminded(ctx) == previous.toString()) return Result.success()
 
@@ -42,6 +43,21 @@ class MonthlyReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineW
             AppPrefs.setLastReminded(ctx, previous.toString())
         }
         return Result.success()
+    }
+
+    /** Volitelná měsíční připomínka zálohy: jednou za měsíc, pokud je poslední záloha starší než 25 dní. */
+    private suspend fun backupReminder(ctx: Context, now: ZonedDateTime) {
+        if (!AppPrefs.backupReminder(ctx)) return
+        val month = YearMonth.from(now).toString()
+        if (AppPrefs.lastBackupReminded(ctx) == month) return
+        val last = AppPrefs.lastBackupAt(ctx)
+        val fresh = last > 0 && System.currentTimeMillis() - last < 25L * 24 * 3600 * 1000
+        val hasData = Graph.realDb(ctx).dao().allShifts().isNotEmpty()
+        if (fresh || !hasData) {
+            AppPrefs.setLastBackupReminded(ctx, month)
+            return
+        }
+        if (Notifier.showBackupReminder(ctx, last)) AppPrefs.setLastBackupReminded(ctx, month)
     }
 
     companion object {

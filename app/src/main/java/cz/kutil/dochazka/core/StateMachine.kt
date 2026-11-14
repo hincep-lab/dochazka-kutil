@@ -43,9 +43,17 @@ data class Snapshot(
 
 sealed interface TrackEvent {
     /** homeWifiConnected: true = telefon je právě na domácí Wi-Fi; null/false = neznámo/není (není důkaz nepřítomnosti). */
-    data class GeoExit(val at: Instant, val homeWifiConnected: Boolean? = null) : TrackEvent
+    /**
+     * lowAccuracy: poloha, která odchod spustila, byla nepřesná (větší chyba než rozumný zlomek zóny).
+     * Nejistý odchod (Wi-Fi doma nebo nepřesná poloha) se nejdřív ověří, teprve pak se uživatele ptáme.
+     */
+    data class GeoExit(val at: Instant, val homeWifiConnected: Boolean? = null, val lowAccuracy: Boolean = false) : TrackEvent
     data class GeoEnter(val at: Instant) : TrackEvent
-    data class WifiRecheck(val pendingId: Long, val stillOnHomeWifi: Boolean, val at: Instant) : TrackEvent
+    /**
+     * Výsledek ověření nejistého odchodu. stillOnHomeWifi = ověřeno, že je uživatel doma
+     * (domácí Wi-Fi nebo čerstvá poloha uvnitř zóny). uncertain = ověřit se nepodařilo (výpadek GPS i Wi-Fi).
+     */
+    data class WifiRecheck(val pendingId: Long, val stillOnHomeWifi: Boolean, val at: Instant, val uncertain: Boolean = false) : TrackEvent
     data class Answer(val pendingId: Long, val yes: Boolean, val at: Instant) : TrackEvent
     data class ManualStart(val at: Instant) : TrackEvent
     data class ManualEnd(val at: Instant) : TrackEvent
@@ -56,7 +64,9 @@ sealed interface Action {
     data class ResolvePending(val id: Long, val status: PendingStatus, val answeredAt: Instant) : Action
     data class SetPairedEnd(val id: Long, val endAt: Instant) : Action
     /** Odložený návrh se potvrdil (Wi-Fi už není připojená) – zobrazit oznámení. */
-    data class ConfirmDeferred(val id: Long) : Action
+    data class ConfirmDeferred(val id: Long, val uncertain: Boolean = false) : Action
+    /** Návrh je v rozporu s dalším vývojem (např. návrat bez odpovědi a nový odchod). */
+    data class MarkConflict(val id: Long, val reason: String) : Action
     data class OpenShift(val start: Instant, val manual: Boolean) : Action
     data class CloseShift(val shiftId: Long, val end: Instant) : Action
     data class CreateClosedShift(val start: Instant, val end: Instant) : Action
@@ -121,11 +131,11 @@ object StateMachine {
             // AWAY + odchod znamená, že se ztratila událost návratu – raději se zeptat znovu.
             TrackState.HOME, TrackState.AWAY -> {
                 if (s.open != null) return Reduction(TrackState.WORKING, emptyList(), "Směna už běží.", last)
-                val deferred = e.homeWifiConnected == true
+                val deferred = e.homeWifiConnected == true || e.lowAccuracy
                 Reduction(
                     TrackState.OUTSIDE_PENDING,
                     listOf(Action.CreatePending(PendingType.START, e.at, null, deferred)),
-                    if (deferred) "Odchod zaznamenán, domácí Wi-Fi je ale připojená – ověřím za chvíli." else "Odchod – dotaz na začátek práce.",
+                    if (deferred) "Odchod zaznamenán, ale není jistý (domácí Wi-Fi nebo nepřesná poloha) – za chvíli ho ověřím." else "Odchod – dotaz na začátek práce.",
                     last,
                 )
             }
@@ -142,7 +152,9 @@ object StateMachine {
                     )
                 } else {
                     // Dotaz na ukončení zůstává nevyřízený v aplikaci, lze ho potvrdit později.
-                    Reduction(TrackState.WORKING, emptyList(), "Odchod bez odpovědi na ukončení – návrh zůstává v aplikaci.", last)
+                    val actions = if (end == null) emptyList() else
+                        listOf(Action.MarkConflict(end.id, "Po návratu následoval další odchod bez odpovědi."))
+                    Reduction(TrackState.WORKING, actions, "Odchod bez odpovědi na ukončení – návrh zůstává v aplikaci.", last)
                 }
             }
         }
@@ -191,11 +203,16 @@ object StateMachine {
             Reduction(
                 if (s.state == TrackState.OUTSIDE_PENDING) TrackState.HOME else s.state,
                 listOf(Action.ResolvePending(p.id, PendingStatus.SUPERSEDED, e.at), Action.ReRegisterZone),
-                "Domácí Wi-Fi stále připojená – odchod byl falešný poplach.",
+                "Ověřeno, že jsi doma – odchod byl falešný poplach.",
                 null,
             )
         } else {
-            Reduction(s.state, listOf(Action.ConfirmDeferred(p.id)), "Wi-Fi už není připojená – dotaz na začátek práce.", s.last)
+            Reduction(
+                s.state,
+                listOf(Action.ConfirmDeferred(p.id, e.uncertain)),
+                if (e.uncertain) "Odchod se nepodařilo ověřit – dotaz je označen jako nejistý." else "Odchod ověřen – dotaz na začátek práce.",
+                s.last,
+            )
         }
     }
 

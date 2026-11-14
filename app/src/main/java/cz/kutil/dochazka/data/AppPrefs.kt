@@ -1,23 +1,82 @@
 package cz.kutil.dochazka.data
 
 import android.content.Context
+import org.json.JSONObject
 
-/** Drobná nastavení mimo databázi (měsíční připomenutí, e-mail příjemce výkazu). */
+/**
+ * Nastavení a provozní údaje mimo databázi (SharedPreferences). Uživatelská nastavení se zálohují,
+ * provozní údaje (poslední odchod, poslední registrace zóny…) slouží jen diagnostice.
+ */
 object AppPrefs {
     private const val FILE = "app_flags"
-    private const val KEY_REMINDER = "monthly_reminder"
-    private const val KEY_EMAIL = "report_email"
-    private const val KEY_LAST_REMINDED = "last_reminded_month"
 
     private fun prefs(ctx: Context) = ctx.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
-    fun reminderEnabled(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_REMINDER, true)
-    fun setReminderEnabled(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean(KEY_REMINDER, on).apply()
+    // --- uživatelská nastavení -------------------------------------------------------------
+    fun reminderEnabled(ctx: Context): Boolean = prefs(ctx).getBoolean("monthly_reminder", true)
+    fun setReminderEnabled(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("monthly_reminder", on).apply()
 
-    fun reportEmail(ctx: Context): String = prefs(ctx).getString(KEY_EMAIL, "") ?: ""
-    fun setReportEmail(ctx: Context, email: String) = prefs(ctx).edit().putString(KEY_EMAIL, email.trim()).apply()
+    fun reportEmail(ctx: Context): String = prefs(ctx).getString("report_email", "") ?: ""
+    fun setReportEmail(ctx: Context, email: String) = prefs(ctx).edit().putString("report_email", email.trim()).apply()
 
-    /** Měsíc (yyyy-MM), za který už připomenutí přišlo. */
-    fun lastReminded(ctx: Context): String = prefs(ctx).getString(KEY_LAST_REMINDED, "") ?: ""
-    fun setLastReminded(ctx: Context, month: String) = prefs(ctx).edit().putString(KEY_LAST_REMINDED, month).apply()
+    /** Po kolika hodinách otevřené směny přijde upozornění na zapomenuté ukončení. */
+    fun longShiftHours(ctx: Context): Int = prefs(ctx).getInt("long_shift_hours", 12).coerceIn(4, 24)
+    fun setLongShiftHours(ctx: Context, hours: Int) = prefs(ctx).edit().putInt("long_shift_hours", hours.coerceIn(4, 24)).apply()
+
+    fun backupReminder(ctx: Context): Boolean = prefs(ctx).getBoolean("backup_reminder", true)
+    fun setBackupReminder(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("backup_reminder", on).apply()
+
+    // --- provozní údaje ----------------------------------------------------------------------
+    /** Měsíc (yyyy-MM), za který už přišlo připomenutí uzávěrky. */
+    fun lastReminded(ctx: Context): String = prefs(ctx).getString("last_reminded_month", "") ?: ""
+    fun setLastReminded(ctx: Context, month: String) = prefs(ctx).edit().putString("last_reminded_month", month).apply()
+
+    fun lastBackupReminded(ctx: Context): String = prefs(ctx).getString("last_backup_reminded", "") ?: ""
+    fun setLastBackupReminded(ctx: Context, month: String) = prefs(ctx).edit().putString("last_backup_reminded", month).apply()
+
+    fun lastBackupAt(ctx: Context): Long = prefs(ctx).getLong("last_backup_at", 0)
+    fun setLastBackupAt(ctx: Context, at: Long) = prefs(ctx).edit().putLong("last_backup_at", at).apply()
+
+    /** „Stále pracuji“ – směna a čas, kdy to uživatel potvrdil. */
+    fun longShiftAck(ctx: Context): Pair<Long, Long> = prefs(ctx).getLong("long_shift_ack_id", -1) to prefs(ctx).getLong("long_shift_ack_at", 0)
+    fun setLongShiftAck(ctx: Context, shiftId: Long, at: Long) =
+        prefs(ctx).edit().putLong("long_shift_ack_id", shiftId).putLong("long_shift_ack_at", at).apply()
+
+    /** Kdy naposledy přišlo upozornění na dlouhou směnu (aby se neopakovalo při každé kontrole). */
+    fun longShiftNotified(ctx: Context): Pair<Long, Long> =
+        prefs(ctx).getLong("long_shift_notified_id", -1) to prefs(ctx).getLong("long_shift_notified_at", 0)
+    fun setLongShiftNotified(ctx: Context, shiftId: Long, at: Long) =
+        prefs(ctx).edit().putLong("long_shift_notified_id", shiftId).putLong("long_shift_notified_at", at).apply()
+
+    // Diagnostika: skutečně zaznamenané události a výsledky registrace zóny.
+    fun lastExitAt(ctx: Context): Long = prefs(ctx).getLong("diag_last_exit", 0)
+    fun lastEnterAt(ctx: Context): Long = prefs(ctx).getLong("diag_last_enter", 0)
+    fun noteTransition(ctx: Context, exit: Boolean, at: Long) =
+        prefs(ctx).edit().putLong(if (exit) "diag_last_exit" else "diag_last_enter", at).apply()
+
+    fun lastZoneOkAt(ctx: Context): Long = prefs(ctx).getLong("diag_zone_ok_at", 0)
+    fun lastZoneError(ctx: Context): Pair<Long, String> =
+        prefs(ctx).getLong("diag_zone_err_at", 0) to (prefs(ctx).getString("diag_zone_err", "") ?: "")
+    fun noteZoneResult(ctx: Context, ok: Boolean, message: String) {
+        val e = prefs(ctx).edit()
+        val now = System.currentTimeMillis()
+        if (ok) e.putLong("diag_zone_ok_at", now).putLong("diag_zone_err_at", 0).putString("diag_zone_err", "")
+        else e.putLong("diag_zone_err_at", now).putString("diag_zone_err", message)
+        e.apply()
+    }
+    fun noteZoneRemoved(ctx: Context) = prefs(ctx).edit().putLong("diag_zone_ok_at", 0).apply()
+
+    // --- záloha uživatelských nastavení -----------------------------------------------------
+    fun toJson(ctx: Context): JSONObject = JSONObject()
+        .put("monthlyReminder", reminderEnabled(ctx))
+        .put("reportEmail", reportEmail(ctx))
+        .put("longShiftHours", longShiftHours(ctx))
+        .put("backupReminder", backupReminder(ctx))
+
+    fun fromJson(ctx: Context, json: JSONObject) {
+        if (json.has("monthlyReminder")) setReminderEnabled(ctx, json.optBoolean("monthlyReminder", true))
+        if (json.has("reportEmail")) setReportEmail(ctx, json.optString("reportEmail", ""))
+        if (json.has("longShiftHours")) setLongShiftHours(ctx, json.optInt("longShiftHours", 12))
+        if (json.has("backupReminder")) setBackupReminder(ctx, json.optBoolean("backupReminder", true))
+    }
 }

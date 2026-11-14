@@ -82,7 +82,7 @@ private fun StatusPill(state: UiState) {
     }
 }
 
-enum class Tab(val label: String) { HOME("Dnes"), MONTH("Měsíc"), PENDING("Návrhy"), SETTINGS("Nastavení") }
+enum class Tab(val label: String) { HOME("Dnes"), MONTH("Měsíc"), PENDING("K potvrzení"), SETTINGS("Nastavení") }
 
 @Composable
 fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
@@ -91,6 +91,8 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
     val snackbar = remember { SnackbarHostState() }
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var detailDate by rememberSaveable { mutableStateOf<String?>(null) }
+    var diag by rememberSaveable { mutableStateOf(false) }
+    var endDialog by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(message) {
         val text = message
@@ -104,6 +106,18 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
         if (requested == "pending") {
             tab = Tab.PENDING
             detailDate = null
+            diag = false
+            requestedTab.value = null
+        } else if (requested == "endshift") {
+            tab = Tab.HOME
+            detailDate = null
+            diag = false
+            endDialog = true
+            requestedTab.value = null
+        } else if (requested == "settings") {
+            tab = Tab.SETTINGS
+            detailDate = null
+            diag = false
             requestedTab.value = null
         } else if (requested != null && requested.startsWith("month")) {
             runCatching { YearMonth.parse(requested.substringAfter("month:", "")) }.getOrNull()?.let { vm.selectedMonth.value = it }
@@ -148,8 +162,25 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
     }
 
     val detail = detailDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-    BackHandler(enabled = detail != null || tab != Tab.HOME) {
-        if (detail != null) detailDate = null else tab = Tab.HOME
+    BackHandler(enabled = detail != null || diag || tab != Tab.HOME) {
+        if (detail != null) detailDate = null else if (diag) diag = false else tab = Tab.HOME
+    }
+
+    val openShift = state.openShift
+    if (endDialog && openShift != null) {
+        EndShiftDialog(
+            startMs = openShift.rawStart,
+            returnAtMs = state.recordedReturn(openShift),
+            onDismiss = { endDialog = false },
+            onEnd = {
+                vm.endWorkAt(it)
+                endDialog = false
+            },
+        )
+    }
+    // Dialog bez otevřené směny nemá smysl (např. směnu mezitím ukončila odpověď z oznámení).
+    LaunchedEffect(endDialog, openShift?.id) {
+        if (endDialog && openShift == null) endDialog = false
     }
 
     Scaffold(
@@ -157,15 +188,16 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
             val today = Fmt.today()
             val (title, subtitle) = when {
                 detail != null -> "${Fmt.dowLong(detail).replaceFirstChar { it.uppercase() }} ${Fmt.date(detail)}" to "Detail dne"
+                diag -> "Stav sledování" to "Diagnostika"
                 tab == Tab.HOME -> "Docházka Kutil" to "${Fmt.dowLong(today)} ${Fmt.date(today)}"
                 tab == Tab.MONTH -> "Přehled měsíce" to state.settings.employee
-                tab == Tab.PENDING -> "Návrhy k potvrzení" to "Čeká: ${state.openPending.size}"
+                tab == Tab.PENDING -> "K potvrzení" to "Nevyřízeno: ${state.openPending.size}"
                 else -> "Nastavení" to state.settings.organization
             }
             TopAppBar(
                 navigationIcon = {
-                    if (detail != null) {
-                        IconButton(onClick = { detailDate = null }) {
+                    if (detail != null || diag) {
+                        IconButton(onClick = { if (detail != null) detailDate = null else diag = false }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zpět")
                         }
                     }
@@ -190,9 +222,10 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
             NavigationBar {
                 for (t in Tab.entries) {
                     NavigationBarItem(
-                        selected = tab == t && detail == null,
+                        selected = tab == t && detail == null && !diag,
                         onClick = {
                             tab = t
+                            diag = false
                             detailDate = null
                         },
                         icon = {
@@ -219,12 +252,20 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
         Box(Modifier.padding(padding).fillMaxSize()) {
             if (detail != null) {
                 DayDetailScreen(vm, state, detail, onBack = { detailDate = null })
+            } else if (diag) {
+                DiagnosticsScreen(vm, state)
             } else {
                 when (tab) {
-                    Tab.HOME -> HomeScreen(vm, state, onOpenDay = { detailDate = it.toString() }, onOpenTab = { tab = it })
+                    Tab.HOME -> HomeScreen(
+                        vm, state,
+                        onOpenDay = { detailDate = it.toString() },
+                        onOpenTab = { tab = it },
+                        onEndWork = { endDialog = true },
+                        onOpenDiag = { diag = true },
+                    )
                     Tab.MONTH -> MonthScreen(vm, state, onOpenDay = { detailDate = it.toString() })
                     Tab.PENDING -> PendingScreen(vm, state, onOpenDay = { detailDate = it.toString() })
-                    Tab.SETTINGS -> SettingsScreen(vm, state)
+                    Tab.SETTINGS -> SettingsScreen(vm, state, onOpenDiag = { diag = true })
                 }
             }
         }

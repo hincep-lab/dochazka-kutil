@@ -35,7 +35,9 @@ jobs:
       - name: Pojmenovat APK
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/debug/app-debug.apk "out/DochazkaKutil-${{ github.run_number }}.apk"
+          V=$(grep -oP 'val appVersion = "\K[^"]+' app/build.gradle.kts)
+          echo "APP_VERSION=$V" >> "$GITHUB_ENV"
+          cp app/build/outputs/apk/debug/app-debug.apk "out/DochazkaKutil-v${V}-${{ github.run_number }}.apk"
           ls -la out
 
       - name: Výsledky testů
@@ -57,6 +59,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "build-${{ github.run_number }}" out/*.apk \
-            --title "Docházka Kutil – sestavení ${{ github.run_number }}" \
+            --title "Docházka Kutil – verze ${APP_VERSION} (sestavení ${{ github.run_number }})" \
             --notes "Automatické sestavení z commitu ${{ github.sha }}. Stáhni soubor .apk níže a nainstaluj ho v telefonu." \
             --latest

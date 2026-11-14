@@ -47,6 +47,49 @@ fun pickDate(context: Context, initial: LocalDate, onPicked: (LocalDate) -> Unit
     DatePickerDialog(context, { _, y, m, d -> onPicked(LocalDate.of(y, m + 1, d)) }, initial.year, initial.monthValue - 1, initial.dayOfMonth).show()
 }
 
+/**
+ * Ukončení otevřené směny. Nabídne skutečný čas návratu domů, pokud ho aplikace zaznamenala,
+ * aktuální čas, nebo ruční zadání. Bez výběru se nic neukončí.
+ */
+@Composable
+fun EndShiftDialog(startMs: Long, returnAtMs: Long?, onDismiss: () -> Unit, onEnd: (Instant) -> Unit) {
+    val context = LocalContext.current
+    var error by remember { mutableStateOf<String?>(null) }
+    val now = System.currentTimeMillis()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Ukončit práci") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Směna běží od ${Fmt.dateTime(startMs)}. Kdy jsi skončil?")
+                if (returnAtMs != null) {
+                    Button(onClick = { onEnd(Instant.ofEpochMilli(returnAtMs)) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Při návratu domů: ${Fmt.dateTime(returnAtMs)}")
+                    }
+                    Text("Tento čas návratu aplikace zaznamenala z polohy.", style = MaterialTheme.typography.bodySmall)
+                }
+                OutlinedButton(onClick = { onEnd(Instant.ofEpochMilli(now)) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Teď: ${Fmt.time(now)}")
+                }
+                OutlinedButton(onClick = {
+                    val z = Fmt.zoned(returnAtMs ?: now)
+                    pickDate(context, z.toLocalDate()) { d ->
+                        pickTime(context, z.toLocalTime()) { t ->
+                            val picked = d.atTime(t).atZone(PRAGUE).toInstant()
+                            if (picked.toEpochMilli() <= startMs) error = "Konec musí být později než začátek směny."
+                            else if (picked.toEpochMilli() > System.currentTimeMillis() + 60_000) error = "Konec nemůže být v budoucnosti."
+                            else onEnd(picked)
+                        }
+                    }
+                }, modifier = Modifier.fillMaxWidth()) { Text("Zadat jiný čas") }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                Text("Čas pak můžeš kdykoli opravit v detailu dne. Do výkazu se zaokrouhlí na půlhodinu.", style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Zatím neukončovat") } },
+    )
+}
+
 /** Zadání dovolené: jeden den (Od = Do) nebo celé období. */
 @Composable
 fun VacationDialog(initial: LocalDate, onDismiss: () -> Unit, onApply: (from: LocalDate, to: LocalDate, skipFree: Boolean, remove: Boolean) -> Unit) {
@@ -192,7 +235,14 @@ fun ShiftEditDialog(
                     error = "Interval má po zaokrouhlení nulovou délku. Uprav časy nebo vypni zaokrouhlení."
                 } else {
                     val w = WorkCalc.validate(effStart, effEnd, others)
-                    if (w.isEmpty()) onSave(startInstant, endInstant, round, note) else warnings = w
+                    if (ShiftWarning.OVERLAP in w) {
+                        // Stejný čas nejde odpracovat dvakrát – překryv se neukládá.
+                        error = "Interval se překrývá s jiným záznamem. Uprav časy, nebo nejdřív oprav ten druhý záznam."
+                    } else if (w.isEmpty()) {
+                        onSave(startInstant, endInstant, round, note)
+                    } else {
+                        warnings = w
+                    }
                 }
             }) { Text("Uložit") }
         },

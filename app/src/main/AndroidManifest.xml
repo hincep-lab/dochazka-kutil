@@ -48,6 +48,9 @@
             android:name=".track.AnswerReceiver"
             android:exported="false" />
         <receiver
+            android:name=".track.ShiftActionReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".track.BootReceiver"
             android:exported="true">
             <intent-filter>

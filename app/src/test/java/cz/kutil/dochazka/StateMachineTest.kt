@@ -28,6 +28,8 @@ private class Sim {
     val resolved = LinkedHashMap<Long, PendingStatus>()
     val shifts = ArrayList<Shift>()
     var reRegistered = 0
+    val uncertain = HashSet<Long>()
+    val conflicts = HashSet<Long>()
     private var nextId = 1L
 
     val open: Shift? get() = shifts.lastOrNull { it.end == null }
@@ -47,7 +49,11 @@ private class Sim {
                 resolved[a.id] = a.status
             }
             is Action.SetPairedEnd -> pending[a.id] = pending[a.id]!!.copy(pairedEndAt = a.endAt)
-            is Action.ConfirmDeferred -> pending[a.id] = pending[a.id]!!.copy(deferred = false)
+            is Action.ConfirmDeferred -> {
+                pending[a.id] = pending[a.id]!!.copy(deferred = false)
+                if (a.uncertain) uncertain.add(a.id)
+            }
+            is Action.MarkConflict -> conflicts.add(a.id)
             is Action.OpenShift -> shifts.add(Shift(nextId++, a.start, null, a.manual))
             is Action.CloseShift -> shifts.first { it.id == a.shiftId }.end = a.end
             is Action.CreateClosedShift -> shifts.add(Shift(nextId++, a.start, a.end, false))
@@ -247,5 +253,52 @@ class StateMachineTest {
         s.send(TrackEvent.GeoExit(t(12, 8, 0)))
         assertEquals(TrackState.OUTSIDE_PENDING, s.state)
         assertEquals(1, s.pending.size)
+    }
+
+    @Test fun nepresnaPolohaSeNejdrivOveri() {
+        val s = Sim()
+        s.send(TrackEvent.GeoExit(t(12, 3, 0), lowAccuracy = true))
+        assertTrue(s.visiblePending.isEmpty()) // žádné oznámení ve tři ráno kvůli skoku GPS
+        s.send(TrackEvent.WifiRecheck(s.onlyPending().id, stillOnHomeWifi = true, at = t(12, 3, 3)))
+        assertEquals(TrackState.HOME, s.state)
+        assertTrue(s.pending.isEmpty())
+    }
+
+    @Test fun vypadekGpsIWifiOznaciDotazJakoNejisty() {
+        val s = Sim()
+        s.send(TrackEvent.GeoExit(t(12, 6, 53), lowAccuracy = true))
+        val id = s.onlyPending().id
+        s.send(TrackEvent.WifiRecheck(id, stillOnHomeWifi = false, at = t(12, 6, 56), uncertain = true))
+        assertEquals(1, s.visiblePending.size)
+        assertTrue(id in s.uncertain)
+        // potvrzení v 10:00 použije čas události 06:53, ne čas kliknutí
+        s.send(TrackEvent.Answer(id, true, t(12, 10, 0)))
+        assertEquals(t(12, 6, 53), s.open!!.start)
+    }
+
+    @Test fun navratBezOdpovediANovyOdchodJeKonflikt() {
+        val s = Sim()
+        s.send(TrackEvent.GeoExit(t(12, 7, 0)))
+        s.send(TrackEvent.Answer(s.onlyPending().id, true, t(12, 7, 1)))
+        s.send(TrackEvent.GeoEnter(t(12, 12, 0)))
+        val end = s.onlyPending().id
+        s.send(TrackEvent.GeoExit(t(12, 12, 40))) // znovu odjel, na dotaz neodpověděl
+        assertTrue(end in s.conflicts)
+        assertEquals(TrackState.WORKING, s.state)
+        assertEquals(1, s.pending.size) // návrh nezmizel
+        // dodatečné ANO uzavře směnu časem návratu 12:00
+        s.send(TrackEvent.Answer(end, true, t(12, 18, 0)))
+        assertEquals(t(12, 12, 0), s.closed.single().end)
+    }
+
+    @Test fun nevyrizeneNavrhyPreziji_snapshotJeJedinyStav() {
+        // Automat nemá žádnou paměť mimo Snapshot: po „restartu“ (nová instance nad stejnými daty) pokračuje stejně.
+        val s = Sim()
+        s.send(TrackEvent.GeoExit(t(12, 6, 53)))
+        val p = s.onlyPending()
+        val snapshot = Snapshot(s.state, listOf(p), null, s.last)
+        val r = StateMachine.reduce(snapshot, TrackEvent.Answer(p.id, true, t(12, 10, 0)))
+        assertEquals(TrackState.WORKING, r.state)
+        assertEquals(t(12, 6, 53), (r.actions.first { it is Action.OpenShift } as Action.OpenShift).start)
     }
 }

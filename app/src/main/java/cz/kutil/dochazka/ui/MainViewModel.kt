@@ -69,10 +69,24 @@ data class UiState(
         return WorkCalc.month(ym, shifts.map { it.toData() }, ov)
     }
 
+    /**
+     * Skutečně zaznamenaný návrat domů během otevřené směny (pro nabídku při ukončení):
+     * poslední událost „návrat“ k této směně, případně poslední přijatý vstup do zóny.
+     */
+    fun recordedReturn(open: ShiftEntity): Long? {
+        val fromEvents = pending.filter { it.type == "END" && it.shiftId == open.id && it.effectiveAt > open.rawStart }
+            .maxOfOrNull { it.effectiveAt }
+        if (fromEvents != null) return fromEvents
+        val at = settings.lastTransitionAt
+        return if (settings.lastTransitionExit == false && at != null && at > open.rawStart) at else null
+    }
+
     /** Výkazové intervaly ostatních uzavřených směn – pro kontrolu překryvů. */
     fun otherIntervals(exceptId: Long?): List<Interval> =
         shifts.filter { it.id != exceptId }.mapNotNull { WorkCalc.effective(it.toData()) }.filter { it.end.isAfter(it.start) }
 }
+
+data class RestorePreview(val uri: Uri, val shifts: Int, val pending: Int, val overrides: Int, val exportedAt: Long, val currentShifts: Int)
 
 data class ShareRequest(val uri: Uri, val email: String, val subject: String, val body: String)
 
@@ -85,6 +99,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Požadavek na otevření e-mailu s přiloženým výkazem (zpracuje ho obrazovka). */
     val share = MutableStateFlow<ShareRequest?>(null)
     val selectedMonth = MutableStateFlow(YearMonth.now(PRAGUE))
+
+    /** Ověřená záloha čekající na potvrzení obnovy. */
+    val restorePreview = MutableStateFlow<RestorePreview?>(null)
 
     val state: StateFlow<UiState> = Graph.demoFlow(app).flatMapLatest { demo ->
         val dao = Graph.db(app, demo).dao()
@@ -111,7 +128,34 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startWork() = launchSafe { message.value = TrackingEngine.handle(ctx, TrackEvent.ManualStart(Instant.now()), demo) }
 
-    fun endWork() = launchSafe { message.value = TrackingEngine.handle(ctx, TrackEvent.ManualEnd(Instant.now()), demo) }
+    fun endWork() = endWorkAt(Instant.now())
+
+    /** Ukončí otevřenou směnu zvoleným časem (teď, zaznamenaný návrat, nebo ručně zadaný čas). */
+    fun endWorkAt(at: Instant) = launchSafe { message.value = TrackingEngine.handle(ctx, TrackEvent.ManualEnd(at), demo) }
+
+    /** „Stále pracuji“ – směna zůstává otevřená, upozornění se na pár hodin odmlčí. */
+    fun stillWorking(shiftId: Long) {
+        AppPrefs.setLongShiftAck(ctx, shiftId, System.currentTimeMillis())
+        cz.kutil.dochazka.track.Notifier.cancelLongShift(ctx)
+        message.value = "Dobře, směna běží dál. Zeptám se znovu za ${cz.kutil.dochazka.core.LongShift.REPEAT_AFTER_ACK_HOURS} hodiny."
+    }
+
+    /** Úprava času nevyřízené události; původně zjištěný čas zůstává uložený. */
+    fun adjustPending(pendingId: Long, at: Instant) = launchSafe {
+        TrackingEngine.adjustPending(ctx, pendingId, at, demo)
+        message.value = "Čas události upraven."
+    }
+
+    fun reRegisterZone() = launchSafe {
+        val r = GeofenceManager.register(ctx, selfHeal = false)
+        if (!r.ok) TrackingEngine.diagnostic(ctx, "Zóna není aktivní: ${r.message}") else TrackingEngine.diagnostic(ctx, "Domácí zóna je znovu aktivní.")
+        message.value = r.message
+    }
+
+    fun sendTestNotification() {
+        message.value = if (cz.kutil.dochazka.track.Notifier.showTest(ctx)) "Zkušební oznámení odesláno – podívej se do oznámení (a na hodinky)."
+        else "Oznámení nejde zobrazit – nejsou povolená."
+    }
 
     fun answer(pendingId: Long, yes: Boolean) = launchSafe {
         message.value = TrackingEngine.handle(ctx, TrackEvent.Answer(pendingId, yes, Instant.now()), demo)
@@ -313,24 +357,37 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun backup(uri: Uri) = launchSafe {
         withContext(Dispatchers.IO) {
-            val json = Backup.export(db())
+            val json = Backup.export(db(), if (demo) null else AppPrefs.toJson(ctx))
             val out = ctx.contentResolver.openOutputStream(uri, "wt") ?: throw IOException("Soubor nelze otevřít pro zápis.")
             out.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+            // Kontrola po zápisu: soubor se přečte zpět a ověří se jeho otisk.
+            val check = ctx.contentResolver.openInputStream(uri)?.use { String(it.readBytes(), Charsets.UTF_8) }
+            if (check == null) throw IOException("Zálohu se nepodařilo po uložení ověřit.")
+            Backup.inspect(check)
         }
-        message.value = "Záloha uložena."
+        if (!demo) AppPrefs.setLastBackupAt(ctx, System.currentTimeMillis())
+        message.value = "Záloha uložena a ověřena."
+    }
+
+    private suspend fun readText(uri: Uri): String = withContext(Dispatchers.IO) {
+        val input = ctx.contentResolver.openInputStream(uri) ?: throw IOException("Soubor nelze otevřít.")
+        input.use { String(it.readBytes(), Charsets.UTF_8) }
+    }
+
+    /** Před obnovou: ověří soubor a připraví přehled toho, co se přepíše. Do dat nesahá. */
+    fun inspectBackup(uri: Uri) = launchSafe {
+        val summary = Backup.inspect(readText(uri))
+        restorePreview.value = RestorePreview(uri, summary.shifts, summary.pending, summary.overrides, summary.exportedAt, state.value.shifts.size)
     }
 
     fun restore(uri: Uri) = launchSafe {
-        val count = withContext(Dispatchers.IO) {
-            val input = ctx.contentResolver.openInputStream(uri) ?: throw IOException("Soubor nelze otevřít.")
-            val json = input.use { String(it.readBytes(), Charsets.UTF_8) }
-            Backup.restore(db(), json)
-        }
+        val summary = Backup.restore(db(), readText(uri))
         if (!demo) {
+            summary.prefs?.let { AppPrefs.fromJson(ctx, it) }
             GeofenceManager.unregister(ctx)
             if (Graph.realDb(ctx).dao().settings()?.trackingEnabled == true) GeofenceManager.register(ctx, selfHeal = false)
         }
-        message.value = "Obnoveno ze zálohy: $count směn."
+        message.value = "Obnoveno ze zálohy: ${summary.shifts} směn, ${summary.pending} událostí, ${summary.overrides} označených dnů."
     }
 
     // --- demo režim -----------------------------------------------------------------------

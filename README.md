@@ -56,6 +56,15 @@ validuje; pokud by neodpovídala, export skončí chybou místo zápisu naslepo.
 - dovolená, nemoc, lékař… → zkratka podle vysvětlivek formuláře (D, N, P, NV…), bez hodin
 - `PŘESČAS. HODINY` se nevyplňuje (definice přesčasu není zadaná)
 
+### Novinky verze 9
+
+- **Zapomenuté ukončení práce:** směna delší než nastavený limit (výchozí 12 h) vyvolá upozornění „Ukončit práci / Stále pracuji“. Nic se neukončuje samo; při ukončení se nabídne zaznamenaný čas návratu.
+- **Spolehlivější rozpoznání odchodu:** vyhodnocuje se přesnost polohy a domácí Wi-Fi. Nejistý odchod se po 3 minutách ověří jednorázovým zjištěním polohy (žádné nepřetržité GPS) – falešný poplach se zahodí, neověřitelný se označí jako nejistý.
+- **K potvrzení:** centrum nevyřízených událostí se zdrojem (GPS / Wi-Fi), jistotou, možností potvrdit, odmítnout a upravit čas; odmítnuté zůstávají v historii.
+- **Záloha s kontrolním otiskem (SHA-256)**, náhled před obnovou, volitelná měsíční připomínka.
+- **Stav sledování:** diagnostika oprávnění, registrace zóny, Wi-Fi, baterie a posledních událostí s tlačítky do nastavení Androidu.
+- Databáze má verzi 2 s migrací z verze 1 – data z dřívějších sestavení zůstávají.
+
 ### Měsíční uzávěrka
 
 Prvního dne v měsíci (po 7:00) přijde připomenutí. Otevře přehled minulého měsíce, kde jdou dny projít
@@ -75,7 +84,8 @@ oprávnění k internetu.
 ## Testy
 
 `./gradlew testDebugUnitTest` – zaokrouhlení, svátky a víkendy, součty (listopad 2026 = 186:00),
-půlnoc, změna času, stavový automat (duplicity, kolísání GPS, ignorované oznámení, Wi-Fi),
-export do skutečného originálu DOCX včetně přílohy.
+půlnoc, změna času, stavový automat (duplicity, kolísání GPS, ignorované oznámení, Wi-Fi, nejisté a konfliktní události),
+export do skutečného originálu DOCX včetně přílohy, a nad skutečnou SQLite databází (Robolectric): migrace schématu,
+záloha a obnova včetně poškozeného souboru, chování po restartu.
 
 Zadání a akceptační testy jsou v `docs/`.

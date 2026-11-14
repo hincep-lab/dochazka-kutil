@@ -8,6 +8,9 @@ plugins {
 // Číslo sestavení z GitHub Actions – každé nové APK jde nainstalovat přes starší.
 val buildNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
 
+// Hlavní číslo verze aplikace (viditelné v Nastavení a v názvu APK).
+val appVersion = "9"
+
 android {
     namespace = "cz.kutil.dochazka"
     compileSdk = 35
@@ -17,7 +20,7 @@ android {
         minSdk = 29
         targetSdk = 35
         versionCode = buildNumber
-        versionName = "1.0.$buildNumber"
+        versionName = "$appVersion.0 (sestavení $buildNumber)"
     }
 
     signingConfigs {
@@ -47,6 +50,8 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // Robolectric testy (Room, záloha, migrace) potřebují manifest a resources.
+        unitTests.isIncludeAndroidResources = true
     }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -74,4 +79,6 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core:1.6.1")
 }

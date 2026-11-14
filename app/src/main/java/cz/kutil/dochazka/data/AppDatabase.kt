@@ -9,6 +9,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,7 +43,10 @@ interface AppDao {
     suspend fun deleteAllShifts()
 
     // --- návrhy ---
-    @Query("SELECT * FROM pending_events ORDER BY eventDetectedAt DESC LIMIT 200")
+    @Query("SELECT * FROM pending_events WHERE shiftId = :shiftId AND type = 'END' ORDER BY eventDetectedAt DESC LIMIT 1")
+    suspend fun lastReturnFor(shiftId: Long): PendingEventEntity?
+
+    @Query("SELECT * FROM pending_events ORDER BY eventDetectedAt DESC LIMIT 300")
     fun pendingFlow(): Flow<List<PendingEventEntity>>
 
     @Query("SELECT * FROM pending_events ORDER BY eventDetectedAt")
@@ -104,11 +109,27 @@ interface AppDao {
 
 @Database(
     entities = [ShiftEntity::class, PendingEventEntity::class, HomeZoneEntity::class, SettingsEntity::class, DayOverrideEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): AppDao
+
+    companion object {
+        /** Verze 2 (aplikace 9): u návrhů přibyl zdroj, jistota, přesnost polohy, ručně upravený čas a poznámka. */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE pending_events ADD COLUMN source TEXT NOT NULL DEFAULT 'GPS'")
+                db.execSQL("ALTER TABLE pending_events ADD COLUMN confidence TEXT NOT NULL DEFAULT 'CERTAIN'")
+                db.execSQL("ALTER TABLE pending_events ADD COLUMN accuracyM REAL")
+                db.execSQL("ALTER TABLE pending_events ADD COLUMN adjustedAt INTEGER")
+                db.execSQL("ALTER TABLE pending_events ADD COLUMN note TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        fun build(ctx: Context, name: String): AppDatabase =
+            Room.databaseBuilder(ctx.applicationContext, AppDatabase::class.java, name).addMigrations(MIGRATION_1_2).build()
+    }
 }
 
 /**
@@ -125,11 +146,19 @@ object Graph {
     @Volatile private var demoLoaded = false
 
     fun realDb(ctx: Context): AppDatabase = real ?: synchronized(this) {
-        real ?: Room.databaseBuilder(ctx.applicationContext, AppDatabase::class.java, "dochazka.db").build().also { real = it }
+        real ?: AppDatabase.build(ctx, "dochazka.db").also { real = it }
     }
 
     fun demoDb(ctx: Context): AppDatabase = demo ?: synchronized(this) {
-        demo ?: Room.databaseBuilder(ctx.applicationContext, AppDatabase::class.java, "dochazka_demo.db").build().also { demo = it }
+        demo ?: AppDatabase.build(ctx, "dochazka_demo.db").also { demo = it }
+    }
+
+    /** Zavře databáze – při dalším použití se otevřou znovu ze souboru (používají testy „restartu“). */
+    fun closeAll() = synchronized(this) {
+        real?.close()
+        demo?.close()
+        real = null
+        demo = null
     }
 
     fun db(ctx: Context, demoMode: Boolean): AppDatabase = if (demoMode) demoDb(ctx) else realDb(ctx)

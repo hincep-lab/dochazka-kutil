@@ -17,7 +17,9 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import cz.kutil.dochazka.core.TrackState
+import cz.kutil.dochazka.data.AppPrefs
 import cz.kutil.dochazka.data.Graph
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
@@ -55,6 +57,14 @@ object GeofenceManager {
      */
     @SuppressLint("MissingPermission")
     suspend fun register(ctx: Context, selfHeal: Boolean): ZoneResult {
+        val result = doRegister(ctx, selfHeal)
+        // Skutečný výsledek od Androidu se ukládá pro obrazovku „Stav sledování“.
+        AppPrefs.noteZoneResult(ctx, result.ok, result.message)
+        return result
+    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun doRegister(ctx: Context, selfHeal: Boolean): ZoneResult {
         val dao = Graph.realDb(ctx).dao()
         val zone = dao.zone() ?: return ZoneResult(false, "Domácí zóna ještě není nastavená.")
         if (!hasFine(ctx)) return ZoneResult(false, "Chybí oprávnění k přesné poloze.")
@@ -87,7 +97,19 @@ object GeofenceManager {
         }
     }
 
-    suspend fun unregister(ctx: Context): Boolean = suspendCancellableCoroutine { cont ->
+    /** Vzdálenost dvou bodů v metrech. */
+    fun distanceM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
+        val out = FloatArray(1)
+        Location.distanceBetween(lat1, lon1, lat2, lon2, out)
+        return out[0]
+    }
+
+    suspend fun unregister(ctx: Context): Boolean {
+        AppPrefs.noteZoneRemoved(ctx)
+        return doUnregister(ctx)
+    }
+
+    private suspend fun doUnregister(ctx: Context): Boolean = suspendCancellableCoroutine { cont ->
         try {
             LocationServices.getGeofencingClient(ctx.applicationContext).removeGeofences(listOf(REQUEST_ID))
                 .addOnCompleteListener { if (cont.isActive) cont.resume(it.isSuccessful) }
@@ -110,7 +132,10 @@ object GeofenceManager {
 
     /** Jednorázové zjištění aktuální polohy pro nastavení domácího bodu. Poloha se nikam neloguje. */
     @SuppressLint("MissingPermission")
-    suspend fun currentLocation(ctx: Context): Location? {
+    suspend fun currentLocation(ctx: Context): Location? = withTimeoutOrNull(25_000L) { requestLocation(ctx) }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun requestLocation(ctx: Context): Location? {
         if (!hasFine(ctx)) return null
         val client = LocationServices.getFusedLocationProviderClient(ctx.applicationContext)
         val cts = CancellationTokenSource()

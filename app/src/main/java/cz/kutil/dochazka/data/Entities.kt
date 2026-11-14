@@ -13,6 +13,17 @@ object Origin {
     const val DEMO = "DEMO"
 }
 
+object EventSource {
+    const val GPS = "GPS"
+    const val GPS_WIFI = "GPS+WIFI"
+}
+
+object Confidence {
+    const val CERTAIN = "CERTAIN"
+    const val UNCERTAIN = "UNCERTAIN"
+    const val CONFLICT = "CONFLICT"
+}
+
 object ShiftStatus {
     const val OPEN = "OPEN"
     const val CLOSED = "CLOSED"
@@ -57,11 +68,24 @@ data class PendingEventEntity(
     val pairedEndAt: Long? = null,
     val shiftId: Long? = null,
     val deferred: Boolean = false,
+    /** Zdroj informace: GPS, GPS+WIFI. */
+    val source: String = EventSource.GPS,
+    /** CERTAIN = jistá, UNCERTAIN = nejistá (nepřesná poloha / neověřeno), CONFLICT = v rozporu s dalším vývojem. */
+    val confidence: String = Confidence.CERTAIN,
+    /** Přesnost polohy, která událost spustila (metry), pokud ji Android poskytl. */
+    val accuracyM: Float? = null,
+    /** Čas, který uživatel ručně nastavil místo zjištěného (původní eventDetectedAt se nepřepisuje). */
+    val adjustedAt: Long? = null,
+    /** Lidsky čitelné vysvětlení (proč je událost nejistá nebo konfliktní). */
+    val note: String = "",
 ) {
+    /** Čas, se kterým se počítá: ruční úprava má přednost před zjištěným časem. */
+    val effectiveAt: Long get() = adjustedAt ?: eventDetectedAt
+
     fun toInfo() = PendingInfo(
         id = id,
         type = PendingType.valueOf(type),
-        detectedAt = Instant.ofEpochMilli(eventDetectedAt),
+        detectedAt = Instant.ofEpochMilli(effectiveAt),
         pairedEndAt = pairedEndAt?.let { Instant.ofEpochMilli(it) },
         shiftId = shiftId,
         deferred = deferred,

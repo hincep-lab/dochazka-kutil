@@ -35,6 +35,7 @@ object Notifier {
         val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
         val channel = NotificationChannel(CHANNEL, "Potvrzení docházky", NotificationManager.IMPORTANCE_HIGH)
         channel.description = "Dotazy na začátek a konec práce při odchodu z domova a návratu."
+        channel.lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
         nm.createNotificationChannel(channel)
         val monthly = NotificationChannel(CHANNEL_MONTHLY, "Měsíční uzávěrka", NotificationManager.IMPORTANCE_DEFAULT)
         monthly.description = "Připomenutí prvního dne v měsíci: zkontrolovat a odeslat docházku za minulý měsíc."
@@ -90,9 +91,9 @@ object Notifier {
     }
 
     fun detail(p: PendingEventEntity): String = when {
-        p.type == "END" -> "Návrat domů zaznamenán ${day(p.eventDetectedAt)} v ${time(p.eventDetectedAt)}."
-        p.pairedEndAt != null -> "Mimo domov ${day(p.eventDetectedAt)} ${time(p.eventDetectedAt)}–${time(p.pairedEndAt)}. Zapsat jako práci?"
-        else -> "Odchod z domova zaznamenán ${day(p.eventDetectedAt)} v ${time(p.eventDetectedAt)}."
+        p.type == "END" -> "Návrat domů zaznamenán ${day(p.effectiveAt)} v ${time(p.effectiveAt)}."
+        p.pairedEndAt != null -> "Mimo domov ${day(p.effectiveAt)} ${time(p.effectiveAt)}–${time(p.pairedEndAt)}. Zapsat jako práci?"
+        else -> "Odchod z domova zaznamenán ${day(p.effectiveAt)} v ${time(p.effectiveAt)}."
     }
 
     fun show(ctx: Context, p: PendingEventEntity) {
@@ -109,7 +110,8 @@ object Notifier {
             .setContentTitle(title(p))
             .setContentText(detail(p))
             .setStyle(NotificationCompat.BigTextStyle().bigText(detail(p) + " Čas půjde v aplikaci upravit."))
-            .setWhen(p.eventDetectedAt)
+            .setWhen(p.effectiveAt)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setShowWhen(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
@@ -132,6 +134,103 @@ object Notifier {
         } catch (e: SecurityException) {
             // Oprávnění bylo mezitím odebráno – návrh zůstává viditelný v aplikaci.
         }
+    }
+
+    // --- zapomenuté ukončení práce ----------------------------------------------------------
+
+    const val LONG_SHIFT_ID = 501
+    const val BACKUP_ID = 502
+    const val TEST_ID = 503
+    const val TEST_PENDING_ID = -2L
+    const val ACTION_STILL_WORKING = "cz.kutil.dochazka.STILL_WORKING"
+    const val EXTRA_SHIFT_ID = "shift_id"
+
+    /**
+     * Směna trvá déle, než je nastavený limit. Nic se neukončuje samo – uživatel buď potvrdí,
+     * že stále pracuje, nebo otevře aplikaci a vybere čas ukončení (nabídne se zaznamenaný návrat).
+     */
+    fun showLongShift(ctx: Context, shiftId: Long, startMs: Long, hours: Long, returnAtMs: Long?): Boolean {
+        if (!canNotify(ctx)) return false
+        ensureChannel(ctx)
+        val end = PendingIntent.getActivity(
+            ctx, LONG_SHIFT_ID,
+            Intent(ctx, MainActivity::class.java).putExtra(EXTRA_OPEN_TAB, "endshift")
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val still = PendingIntent.getBroadcast(
+            ctx, LONG_SHIFT_ID,
+            Intent(ctx, ShiftActionReceiver::class.java).setAction(ACTION_STILL_WORKING).putExtra(EXTRA_SHIFT_ID, shiftId),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val text = "Směna běží už $hours h (od ${day(startMs)} ${time(startMs)})." +
+            (returnAtMs?.let { " Návrat domů byl zaznamenán v ${time(it)}." } ?: "") + " Zapomněl jsi ji ukončit?"
+        val builder = NotificationCompat.Builder(ctx, CHANNEL)
+            .setSmallIcon(R.drawable.ic_notif)
+            .setContentTitle("Pracuješ ještě?")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setAutoCancel(true)
+            .setContentIntent(end)
+            .addAction(0, "Ukončit práci", end)
+            .addAction(0, "Stále pracuji", still)
+        return notifySafe(ctx, LONG_SHIFT_ID, builder)
+    }
+
+    fun cancelLongShift(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(LONG_SHIFT_ID)
+
+    fun showBackupReminder(ctx: Context, lastBackupMs: Long): Boolean {
+        if (!canNotify(ctx)) return false
+        ensureChannel(ctx)
+        val open = PendingIntent.getActivity(
+            ctx, BACKUP_ID,
+            Intent(ctx, MainActivity::class.java).putExtra(EXTRA_OPEN_TAB, "settings")
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val text = (if (lastBackupMs > 0) "Poslední záloha: ${day(lastBackupMs)}" else "Docházka ještě nebyla zálohována") +
+            ". Klepni a ulož si zálohu, ať o data nepřijdeš při ztrátě telefonu."
+        val builder = NotificationCompat.Builder(ctx, CHANNEL_MONTHLY)
+            .setSmallIcon(R.drawable.ic_notif)
+            .setContentTitle("Zálohuj docházku")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(open)
+        return notifySafe(ctx, BACKUP_ID, builder)
+    }
+
+    /** Zkušební dotaz – ověří oznámení (i na hodinkách), do docházky nic nezapisuje. */
+    fun showTest(ctx: Context): Boolean {
+        if (!canNotify(ctx)) return false
+        ensureChannel(ctx)
+        val builder = NotificationCompat.Builder(ctx, CHANNEL)
+            .setSmallIcon(R.drawable.ic_notif)
+            .setContentTitle("Zkušební dotaz")
+            .setContentText("Takhle bude vypadat dotaz na začátek práce. Tlačítka nic nezapíšou.")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setAutoCancel(true)
+        for (yes in listOf(true, false)) {
+            val intent = Intent(ctx, AnswerReceiver::class.java).setAction("cz.kutil.dochazka.ANSWER")
+                .putExtra(EXTRA_PENDING_ID, TEST_PENDING_ID).putExtra(EXTRA_YES, yes)
+            val pi = PendingIntent.getBroadcast(ctx, TEST_ID * 2 + (if (yes) 1 else 0), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            builder.addAction(0, if (yes) "ANO" else "NE", pi)
+        }
+        return notifySafe(ctx, TEST_ID, builder)
+    }
+
+    fun cancelTest(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(TEST_ID)
+
+    private fun notifySafe(ctx: Context, id: Int, builder: NotificationCompat.Builder): Boolean = try {
+        NotificationManagerCompat.from(ctx).notify(id, builder.build())
+        true
+    } catch (e: SecurityException) {
+        false
     }
 
     fun cancel(ctx: Context, pendingId: Long) {

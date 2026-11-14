@@ -119,6 +119,23 @@ class WorkCalcTest {
         assertEquals("17:00", day.pieces[1].startText())
     }
 
+    @Test fun beznaPraceAVecerniVyjezdJe11Hodin() {
+        val shifts = listOf(
+            ShiftData(1, t(2026, 11, 12, 7, 0), t(2026, 11, 12, 15, 30)),
+            ShiftData(2, t(2026, 11, 12, 17, 0), t(2026, 11, 12, 19, 30)),
+        )
+        val day = WorkCalc.month(YearMonth.of(2026, 11), shifts).day(12)
+        assertEquals("11:00", WorkCalc.formatHm(day.minutes))
+        assertEquals(150, day.overtimeMinutes)
+    }
+
+    @Test fun neomezenyPocetIntervaluZaDen() {
+        val shifts = (0 until 8).map { ShiftData(it.toLong(), t(2026, 11, 12, 6 + 2 * it, 0), t(2026, 11, 12, 7 + 2 * it, 0)) }
+        val day = WorkCalc.month(YearMonth.of(2026, 11), shifts).day(12)
+        assertEquals(8, day.pieces.size)
+        assertEquals(480, day.minutes)
+    }
+
     @Test fun simulovanyListopad2026Je186Hodin() {
         val m = WorkCalc.month(DemoData.MONTH, DemoData.november2026())
         assertEquals(21, m.days.count { it.pieces.isNotEmpty() && it.flags.none { f -> f == DayFlag.SATURDAY || f == DayFlag.SUNDAY } })
@@ -218,5 +235,24 @@ class WorkCalcTest {
         assertEquals("8:30", WorkCalc.formatHm(510))
         assertEquals("186:00", WorkCalc.formatHm(11160))
         assertEquals("0:05", WorkCalc.formatHm(5))
+    }
+}
+
+class LongShiftTest {
+    private val h = 3_600_000L
+
+    @Test fun upozorniAzPoLimitu() {
+        assertFalse(cz.kutil.dochazka.core.LongShift.isDue(11 * h, 0, 12, null, null))
+        assertTrue(cz.kutil.dochazka.core.LongShift.isDue(12 * h, 0, 12, null, null))
+        assertTrue(cz.kutil.dochazka.core.LongShift.isDue(9 * h, 0, 8, null, null)) // limit je nastavitelný
+    }
+
+    @Test fun neopakujeSeAPoPotvrzeniPockaCtyriHodiny() {
+        val ls = cz.kutil.dochazka.core.LongShift
+        assertFalse(ls.isDue(13 * h, 0, 12, null, 12 * h))           // už upozorněno
+        assertFalse(ls.isDue(15 * h, 0, 12, 13 * h, 12 * h))         // „stále pracuji“ ve 13. hodině
+        assertTrue(ls.isDue(17 * h, 0, 12, 13 * h, 12 * h))          // o 4 hodiny později znovu
+        assertFalse(ls.isDue(18 * h, 0, 12, 13 * h, 17 * h))         // a zase jen jednou
+        assertTrue(ls.exceeds(12 * h, 0, 12))
     }
 }

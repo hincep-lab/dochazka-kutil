@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -27,7 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cz.kutil.dochazka.core.LongShift
 import cz.kutil.dochazka.core.OverrideType
+import cz.kutil.dochazka.data.AppPrefs
 import cz.kutil.dochazka.core.PRAGUE
 import cz.kutil.dochazka.core.Rounding
 import cz.kutil.dochazka.core.TrackState
@@ -59,7 +64,14 @@ private fun BigButton(text: String, enabled: Boolean = true, primary: Boolean = 
 }
 
 @Composable
-fun HomeScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Unit, onOpenTab: (Tab) -> Unit) {
+fun HomeScreen(
+    vm: MainViewModel,
+    state: UiState,
+    onOpenDay: (LocalDate) -> Unit,
+    onOpenTab: (Tab) -> Unit,
+    onEndWork: () -> Unit,
+    onOpenDiag: () -> Unit,
+) {
     val context = LocalContext.current
     val perm = rememberPermStatus()
     val today = Fmt.today()
@@ -68,11 +80,66 @@ fun HomeScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Unit
     val open = state.openShift
     var addDialog by remember { mutableStateOf(false) }
     var vacationDialog by remember { mutableStateOf(false) }
+    var ackTick by remember { mutableIntStateOf(0) }
+    val diagKey = state.settings.lastDiagnosticAt
+    val lastExit = remember(diagKey) { AppPrefs.lastExitAt(context) }
+    val lastEnter = remember(diagKey) { AppPrefs.lastEnterAt(context) }
+    val trackingProblem = state.settings.trackingEnabled && !state.demo &&
+        (state.zone == null || !perm.trackingReady || !perm.notifications)
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // --- přehled -----------------------------------------------------------------------
+        SectionCard("Přehled") {
+            InfoRow("Stav", if (open != null) "V práci od ${Fmt.time(open.editedStart ?: Rounding.roundToHalfHour(Instant.ofEpochMilli(open.rawStart)).toEpochMilli())}" else trackStateText(state.settings.trackState))
+            InfoRow("Dnes odpracováno", "${WorkCalc.formatHm(day.minutes)} h")
+            InfoRow("Tento měsíc", "${WorkCalc.formatHm(month.totalMinutes)} h")
+            InfoRow("K potvrzení", if (state.openPending.isEmpty()) "nic" else "${state.openPending.size}", highlight = state.openPending.isNotEmpty())
+            if (!state.demo) {
+                InfoRow("Poslední odchod", if (lastExit > 0) Fmt.dateTime(lastExit) else "zatím žádný")
+                InfoRow("Poslední návrat", if (lastEnter > 0) Fmt.dateTime(lastEnter) else "zatím žádný")
+                InfoRow(
+                    "Automatické sledování",
+                    when {
+                        !state.settings.trackingEnabled -> "vypnuté"
+                        trackingProblem -> "vyžaduje pozornost"
+                        else -> "zapnuté"
+                    },
+                    highlight = trackingProblem,
+                )
+            }
+        }
+
+        // --- zapomenuté ukončení práce ------------------------------------------------------
+        if (open != null && !state.demo) {
+            val limit = AppPrefs.longShiftHours(context)
+            val nowMs = System.currentTimeMillis()
+            val ack = remember(ackTick, open.id) { AppPrefs.longShiftAck(context) }
+            val acked = ack.first == open.id && nowMs - ack.second < LongShift.REPEAT_AFTER_ACK_HOURS * 3_600_000L
+            if (LongShift.exceeds(nowMs, open.rawStart, limit) && !acked) {
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "Směna běží už ${(nowMs - open.rawStart) / 3_600_000L} hodin",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                        Text("Nezapomněl jsi ukončit práci? Sama se směna nikdy neukončí.", color = MaterialTheme.colorScheme.onErrorContainer)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = onEndWork, modifier = Modifier.weight(1f)) { Text("Ukončit práci") }
+                            OutlinedButton(onClick = {
+                                vm.stillWorking(open.id)
+                                ackTick++
+                            }, modifier = Modifier.weight(1f)) { Text("Stále pracuji") }
+                        }
+                    }
+                }
+            }
+        }
+
         // --- stav sledování ---------------------------------------------------------------
         SectionCard("Stav sledování") {
             if (state.demo) {
@@ -89,7 +156,7 @@ fun HomeScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Unit
                     "Otevřít nastavení aplikace",
                 ) { SystemScreens.appSettings(context) }
                 if (!perm.locationOn) Problem("Poloha v telefonu je vypnutá – sledování zóny stojí.", "Zapnout polohu") { SystemScreens.locationSettings(context) }
-                if (!perm.notifications) Problem("Oznámení jsou vypnutá – dotazy uvidíš jen tady v aplikaci (záložka Návrhy).", "Povolit oznámení") {
+                if (!perm.notifications) Problem("Oznámení jsou vypnutá – dotazy uvidíš jen tady v aplikaci (záložka K potvrzení).", "Povolit oznámení") {
                     SystemScreens.notificationSettings(context)
                 }
                 if (!perm.batteryUnrestricted) Problem(
@@ -103,6 +170,7 @@ fun HomeScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Unit
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
+            if (!state.demo) TextButton(onClick = onOpenDiag) { Text("Podrobný stav sledování") }
         }
 
         // --- nevyřízené návrhy ------------------------------------------------------------
@@ -132,7 +200,7 @@ fun HomeScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Unit
         // --- velká tlačítka ---------------------------------------------------------------
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             BigButton("Začít práci", enabled = open == null, modifier = Modifier.weight(1f)) { vm.startWork() }
-            BigButton("Ukončit práci", enabled = open != null, modifier = Modifier.weight(1f)) { vm.endWork() }
+            BigButton("Ukončit práci", enabled = open != null, modifier = Modifier.weight(1f)) { onEndWork() }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             BigButton("Přidat výjezd", primary = false, modifier = Modifier.weight(1f)) { addDialog = true }
@@ -191,6 +259,14 @@ fun HomeScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Unit
                 addDialog = false
             },
         )
+    }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String, highlight: Boolean = false) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, fontWeight = FontWeight.Bold, color = if (highlight) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
     }
 }
 

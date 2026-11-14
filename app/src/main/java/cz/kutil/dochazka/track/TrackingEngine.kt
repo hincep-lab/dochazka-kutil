@@ -9,6 +9,9 @@ import cz.kutil.dochazka.core.Snapshot
 import cz.kutil.dochazka.core.StateMachine
 import cz.kutil.dochazka.core.TrackEvent
 import cz.kutil.dochazka.core.TrackState
+import cz.kutil.dochazka.data.AppPrefs
+import cz.kutil.dochazka.data.Confidence
+import cz.kutil.dochazka.data.EventSource
 import cz.kutil.dochazka.data.Graph
 import cz.kutil.dochazka.data.Origin
 import cz.kutil.dochazka.data.PendingEventEntity
@@ -19,23 +22,34 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 
+/** Doplňující údaje k události z polohy: odkud informace pochází a jak je spolehlivá. */
+data class EventMeta(
+    val source: String = EventSource.GPS,
+    val accuracyM: Float? = null,
+    val uncertain: Boolean = false,
+    val note: String = "",
+)
+
 /**
  * Propojuje čistý stavový automat s Room databází a oznámeními.
  * Všechny události (geofence, odpovědi, ruční tlačítka) jdou přes jeden zámek a jednu transakci,
- * takže opakované nebo souběžné doručení nevytvoří duplicitní záznamy.
+ * takže opakované nebo souběžné doručení nevytvoří duplicitní záznamy. Veškerý stav je v databázi –
+ * po restartu aplikace i telefonu se pokračuje přesně tam, kde se skončilo.
  */
 object TrackingEngine {
     private val mutex = Mutex()
 
-    suspend fun handle(ctx: Context, event: TrackEvent, demo: Boolean = false): String = mutex.withLock {
+    suspend fun handle(ctx: Context, event: TrackEvent, demo: Boolean = false, meta: EventMeta? = null): String = mutex.withLock {
         val app = ctx.applicationContext
         val db = Graph.db(app, demo)
         val dao = db.dao()
         val notify = ArrayList<Long>()
         val cancel = ArrayList<Long>()
-        val recheck = ArrayList<Long>()
+        val verify = ArrayList<Long>()
         var reRegister = false
+        var shiftClosed = false
         var note = ""
+        val m = meta ?: EventMeta()
 
         db.withTransaction {
             val settings = dao.settings() ?: SettingsEntity()
@@ -61,9 +75,13 @@ object TrackingEngine {
                                 promptCreatedAt = now,
                                 shiftId = a.shiftId,
                                 deferred = a.deferred,
+                                source = m.source,
+                                confidence = if (m.uncertain) Confidence.UNCERTAIN else Confidence.CERTAIN,
+                                accuracyM = m.accuracyM,
+                                note = m.note,
                             )
                         )
-                        if (a.deferred) recheck.add(id) else notify.add(id)
+                        if (a.deferred) verify.add(id) else notify.add(id)
                     }
                     is Action.ResolvePending -> {
                         dao.pending(a.id)?.let {
@@ -76,8 +94,21 @@ object TrackingEngine {
                         notify.add(a.id)
                     }
                     is Action.ConfirmDeferred -> {
-                        dao.pending(a.id)?.let { dao.updatePending(it.copy(deferred = false, promptCreatedAt = now)) }
+                        dao.pending(a.id)?.let {
+                            dao.updatePending(
+                                it.copy(
+                                    deferred = false,
+                                    promptCreatedAt = now,
+                                    confidence = if (a.uncertain) Confidence.UNCERTAIN else Confidence.CERTAIN,
+                                    source = if (m.source == EventSource.GPS_WIFI) EventSource.GPS_WIFI else it.source,
+                                    note = m.note.ifBlank { it.note },
+                                )
+                            )
+                        }
                         notify.add(a.id)
+                    }
+                    is Action.MarkConflict -> {
+                        dao.pending(a.id)?.let { dao.updatePending(it.copy(confidence = Confidence.CONFLICT, note = a.reason)) }
                     }
                     is Action.OpenShift -> dao.insertShift(
                         ShiftEntity(
@@ -87,8 +118,11 @@ object TrackingEngine {
                             status = ShiftStatus.OPEN,
                         )
                     )
-                    is Action.CloseShift -> dao.shift(a.shiftId)?.let {
-                        dao.updateShift(it.copy(rawEnd = a.end.toEpochMilli(), status = ShiftStatus.CLOSED, updatedAt = now))
+                    is Action.CloseShift -> {
+                        dao.shift(a.shiftId)?.let {
+                            dao.updateShift(it.copy(rawEnd = a.end.toEpochMilli(), status = ShiftStatus.CLOSED, updatedAt = now))
+                        }
+                        shiftClosed = true
                     }
                     is Action.CreateClosedShift -> dao.insertShift(
                         ShiftEntity(
@@ -114,12 +148,30 @@ object TrackingEngine {
         }
 
         if (!demo) {
+            // Diagnostika: skutečně přijaté přechody zóny (i ty, které automat vyhodnotil jako duplicitu).
+            when (event) {
+                is TrackEvent.GeoExit -> AppPrefs.noteTransition(app, true, event.at.toEpochMilli())
+                is TrackEvent.GeoEnter -> AppPrefs.noteTransition(app, false, event.at.toEpochMilli())
+                else -> Unit
+            }
             cancel.forEach { Notifier.cancel(app, it) }
             notify.filter { it !in cancel }.forEach { id -> dao.pending(id)?.let { Notifier.show(app, it) } }
-            recheck.forEach { WifiRecheckWorker.schedule(app, it) }
+            verify.forEach { VerifyExitWorker.schedule(app, it) }
+            if (shiftClosed) Notifier.cancelLongShift(app)
             if (reRegister) GeofenceManager.register(app, selfHeal = false)
         }
         note
+    }
+
+    /** Uživatel upravil čas nevyřízené události. Původně zjištěný čas zůstává uložený. */
+    suspend fun adjustPending(ctx: Context, pendingId: Long, at: Instant, demo: Boolean = false) = mutex.withLock {
+        val app = ctx.applicationContext
+        val dao = Graph.db(app, demo).dao()
+        val p = dao.pending(pendingId) ?: return@withLock
+        if (p.status != "PENDING") return@withLock
+        val updated = p.copy(adjustedAt = at.toEpochMilli())
+        dao.updatePending(updated)
+        if (!demo && !updated.deferred) Notifier.show(app, updated)
     }
 
     /** Zapíše diagnostickou zprávu (např. chybu geofence) – zobrazuje se na hlavní obrazovce. */
@@ -129,9 +181,11 @@ object TrackingEngine {
         dao.upsertSettings(s.copy(lastDiagnostic = message, lastDiagnosticAt = System.currentTimeMillis()))
     }
 
-    /** Po restartu telefonu oznámení zmizí – znovu zobrazí všechny nevyřízené návrhy. */
+    /** Po restartu telefonu oznámení zmizí – znovu zobrazí všechny nevyřízené návrhy a doplánuje ověření. */
     suspend fun repostPending(ctx: Context) {
         val app = ctx.applicationContext
-        Graph.realDb(app).dao().openPending().filter { !it.deferred }.forEach { Notifier.show(app, it) }
+        for (p in Graph.realDb(app).dao().openPending()) {
+            if (p.deferred) VerifyExitWorker.schedule(app, p.id) else Notifier.show(app, p)
+        }
     }
 }
