@@ -82,3 +82,21 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("androidx.test:core:1.6.1")
 }
+
+// V záznamu sestavení je vidět každý test jménem a celkový součet.
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events("passed", "failed", "skipped")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+    addTestListener(object : TestListener {
+        override fun beforeSuite(suite: TestDescriptor) = Unit
+        override fun beforeTest(testDescriptor: TestDescriptor) = Unit
+        override fun afterTest(testDescriptor: TestDescriptor, result: TestResult) = Unit
+        override fun afterSuite(suite: TestDescriptor, result: TestResult) {
+            if (suite.parent == null) {
+                println("VYSLEDEK TESTU: ${result.testCount} celkem, ${result.successfulTestCount} uspesnych, ${result.failedTestCount} neuspesnych, ${result.skippedTestCount} preskocenych")
+            }
+        }
+    })
+}
