@@ -71,8 +71,9 @@ class DocxExportTest {
         assertEquals(36, t.size)
         // běžný den: pondělí 2. 11.
         assertEquals(listOf("2", "07:00", "15:30", "", "", "", "", "", "", "", "", "8:30"), t[3])
-        // neděle 1. 11. prázdná
-        assertEquals(listOf("1", "", "", "", "", "", "", "", "", "", "", ""), t[2])
+        // volná neděle 1. 11. a sobota 7. 11. jsou proškrtnuté
+        assertEquals(listOf("1") + List(10) { DocxExporter.DASH } + DocxExporter.DASH_WIDE, t[2])
+        assertEquals(listOf("7") + List(10) { DocxExporter.DASH } + DocxExporter.DASH_WIDE, t[8])
         // 12. 11. dva intervaly ve správných polích (Dopoledne + Odpoledne)
         assertEquals(listOf("12", "07:00", "15:30", "17:00", "19:00", "", "", "", "", "", "", "10:30"), t[13])
         assertEquals(listOf("14", "09:00", "12:00", "", "", "", "", "", "", "", "", "3:00"), t[15])
@@ -88,7 +89,7 @@ class DocxExportTest {
         assertEquals("---------", t[34].last())
         assertEquals("186:00", t[35].last())
         // součet denních hodin = celkem
-        val sum = (2..32).sumOf { r -> t[r][11].takeIf { it.isNotEmpty() }?.let { it.substringBefore(":").toLong() * 60 + it.substringAfter(":").toLong() } ?: 0L }
+        val sum = (2..32).sumOf { r -> t[r][11].takeIf { it.matches(Regex("\\d+:\\d\\d")) }?.let { it.substringBefore(":").toLong() * 60 + it.substringAfter(":").toLong() } ?: 0L }
         assertEquals(186 * 60L, sum)
 
         val text = DocxExporter.text(xml)
@@ -175,8 +176,10 @@ class DocxExportTest {
         // lékař + odpracovaný zbytek dne: zkratka v dalším volném poli, hodiny jen za práci
         assertEquals(listOf("24", "10:00", "15:30", "P", "", "", "", "", "", "", "", "5:30"), t[25])
         assertEquals("NV", t[26][1])
-        // svátek ve všední den bez práce = S, bez hodin
-        assertEquals(listOf("17", "S", "", "", "", "", "", "", "", "", "", ""), t[18])
+        // svátek ve všední den bez práce = S + „st. svátek“, bez hodin
+        assertEquals(listOf("17", "S", "", "", "", "", "", "", "", "", "", "st. svátek"), t[18])
+        // dovolená o víkendu se neproškrtává, pracovní sobota také ne
+        assertEquals(DocxExporter.DASH, t[15][1])
         assertEquals(330L, report.totalMinutes)
         assertEquals("5:30", t[35].last())
     }

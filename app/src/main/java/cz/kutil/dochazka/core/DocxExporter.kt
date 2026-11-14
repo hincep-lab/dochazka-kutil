@@ -62,6 +62,10 @@ object DocxExporter {
     private const val C_BREAK1 = 5
     private const val C_HOURS = 11
 
+    /** Proškrtnutí volného víkendu (dlouhé pomlčky splývají v čáru). */
+    const val DASH = "——"
+    const val DASH_WIDE = "———————"
+
     // Tabulátory řádku Jméno / Měsíc / Rok (v twipech od levého okraje textu).
     private const val TAB_MONTH = 4300
     private const val TAB_YEAR = 7900
@@ -126,11 +130,17 @@ object DocxExporter {
                 edits.add(cellText(xml, row.cells[C_PM_IN], it.startText(), RPR_CELL))
                 edits.add(cellText(xml, row.cells[C_PM_OUT], it.endText(), RPR_CELL))
             }
-            // Zkratka dle vysvětlivek: ruční označení dne, případně „S“ pro svátek ve všední den bez práce.
-            val code = day.override?.code
-                ?: if (pieces.isEmpty() && DayFlag.HOLIDAY in day.flags &&
-                    DayFlag.SATURDAY !in day.flags && DayFlag.SUNDAY !in day.flags
-                ) "S" else null
+            val weekend = DayFlag.SATURDAY in day.flags || DayFlag.SUNDAY in day.flags
+            val free = pieces.isEmpty() && day.override == null
+            if (free && weekend) {
+                // Volný víkend se proškrtne přes celý řádek.
+                for (c in C_AM_IN until C_HOURS) edits.add(cellText(xml, row.cells[c], DASH, RPR_CELL))
+                edits.add(cellText(xml, row.cells[C_HOURS], DASH_WIDE, RPR_CELL))
+            }
+            // Svátek ve všední den bez práce: zkratka „S“ podle vysvětlivek a slovně „st. svátek“.
+            val freeHoliday = free && !weekend && DayFlag.HOLIDAY in day.flags
+            if (freeHoliday) edits.add(cellText(xml, row.cells[C_HOURS], "st. svátek", RPR_CELL))
+            val code = day.override?.code ?: if (freeHoliday) "S" else null
             if (code != null) {
                 val target = when (pieces.size) {
                     0 -> C_AM_IN
