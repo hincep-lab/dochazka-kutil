@@ -208,6 +208,7 @@ private fun originText(origin: String): String = when (origin) {
 }
 
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun DayDetailScreen(vm: MainViewModel, state: UiState, date: LocalDate, onBack: () -> Unit) {
     val month = remember(state.shifts, state.overrides, date) { state.month(YearMonth.from(date)) }
     val day = month.day(date.dayOfMonth)
@@ -226,10 +227,6 @@ fun DayDetailScreen(vm: MainViewModel, state: UiState, date: LocalDate, onBack: 
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zpět") }
-            Text("${Fmt.dowLong(date)} ${Fmt.date(date)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        }
         day.holidayName?.let { Text("Státní svátek: $it", color = MaterialTheme.colorScheme.tertiary) }
         if (day.workLabels.isNotEmpty()) Text(day.workLabels.joinToString(" · "), color = MaterialTheme.colorScheme.tertiary, fontWeight = FontWeight.Bold)
         Text("Odpracováno: ${WorkCalc.formatHm(day.minutes)} h", fontSize = 20.sp, fontWeight = FontWeight.Bold)
