@@ -71,9 +71,11 @@ class DocxExportTest {
         assertEquals(36, t.size)
         // běžný den: pondělí 2. 11.
         assertEquals(listOf("2", "07:00", "15:30", "", "", "", "", "", "", "", "", "8:30"), t[3])
-        // volná neděle 1. 11. a sobota 7. 11. jsou proškrtnuté
-        assertEquals(listOf("1") + List(10) { DocxExporter.DASH } + DocxExporter.DASH_WIDE, t[2])
-        assertEquals(listOf("7") + List(10) { DocxExporter.DASH } + DocxExporter.DASH_WIDE, t[8])
+        // volné víkendy: bez textu, proškrtnuté čarou – 1. 11., 7.–8., 21.–22., 28.–29. = 4 čáry
+        assertEquals(listOf("1", "", "", "", "", "", "", "", "", "", "", ""), t[2])
+        assertEquals(4, count(xml, "<v:line "))
+        assertTrue(xml.contains("from=\"-3.5pt,26.0pt\" to=\"393.5pt,0pt\""))
+        assertTrue(xml.contains("from=\"-3.5pt,13.0pt\" to=\"393.5pt,0pt\""))
         // 12. 11. dva intervaly ve správných polích (Dopoledne + Odpoledne)
         assertEquals(listOf("12", "07:00", "15:30", "17:00", "19:00", "", "", "", "", "", "", "10:30"), t[13])
         assertEquals(listOf("14", "09:00", "12:00", "", "", "", "", "", "", "", "", "3:00"), t[15])
@@ -84,9 +86,9 @@ class DocxExportTest {
         assertEquals("8:30", t[31][11])
         // den 31 v listopadu neexistuje -> prázdný
         assertEquals(listOf("31", "", "", "", "", "", "", "", "", "", "", ""), t[32])
-        // součty; přesčas se nevyplňuje (zůstává původní obsah formuláře)
-        assertEquals("186:00", t[33].last())
-        assertEquals("---------", t[34].last())
+        // součty: 12. 11. výjezd 17:00–19:00 je po 15:30 v pracovní den = 2 h přesčas
+        assertEquals("184:00", t[33].last())
+        assertEquals("2:00", t[34].last())
         assertEquals("186:00", t[35].last())
         // součet denních hodin = celkem
         val sum = (2..32).sumOf { r -> t[r][11].takeIf { it.matches(Regex("\\d+:\\d\\d")) }?.let { it.substringBefore(":").toLong() * 60 + it.substringAfter(":").toLong() } ?: 0L }
@@ -125,6 +127,7 @@ class DocxExportTest {
         }
         // Po odebrání vložených běhů musí být dokument totožný s originálem – kromě řádku Jméno/Měsíc/Rok.
         val stripped = nXml.replace(Regex("<w:r w:rsidR=\"${DocxExporter.MARK}\">[\\s\\S]*?</w:r>"), "")
+            .replace(">2:00</w:t>", ">---------</w:t>") // hodnota přesčasu nahrazuje původní pomlčky
         // porovnává se vše před odstavcem Jméno/Měsíc/Rok a vše za ním
         fun cut(x: String, needle: String) = x.indexOf(needle).let { x.substring(0, x.lastIndexOf("<w:p ", it)) to x.substring(x.indexOf("</w:p>", it)) }
         val cutO = cut(oXml, "Jméno :")
@@ -150,6 +153,7 @@ class DocxExportTest {
         val t = table(xml)
         assertEquals(listOf("12", "07:00", "15:30", "17:00", "19:00", "", "", "", "", "", "", "12:30  viz příloha"), t[13])
         assertEquals("188:00", t[35].last())
+        assertEquals("4:00", t[34].last()) // 17–19, 20–21, 22–23
         val text = DocxExporter.text(xml)
         assertTrue(text.contains("PŘÍLOHA K EVIDENCI DOCHÁZKY"))
         // žádný interval se neztratil
@@ -178,8 +182,8 @@ class DocxExportTest {
         assertEquals("NV", t[26][1])
         // svátek ve všední den bez práce = S + „st. svátek“, bez hodin
         assertEquals(listOf("17", "S", "", "", "", "", "", "", "", "", "", "st. svátek"), t[18])
-        // dovolená o víkendu se neproškrtává, pracovní sobota také ne
-        assertEquals(DocxExporter.DASH, t[15][1])
+        // bez přesčasu zůstávají v poli původní pomlčky
+        assertEquals("---------", t[34].last())
         assertEquals(330L, report.totalMinutes)
         assertEquals("5:30", t[35].last())
     }

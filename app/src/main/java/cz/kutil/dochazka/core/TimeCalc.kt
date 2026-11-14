@@ -84,6 +84,8 @@ data class DaySummary(
     val holidayName: String?,
     val override: OverrideType?,
     val overrideNote: String = "",
+    /** Přesčas: v pracovní dny (po–pá mimo svátky) čas odpracovaný po 15:30. */
+    val overtimeMinutes: Long = 0,
 ) {
     /** Štítky „Práce v sobotu / v neděli / ve svátek“ – jen pokud se ten den pracovalo. */
     val workLabels: List<String>
@@ -98,6 +100,8 @@ data class MonthSummary(
     val month: YearMonth,
     val days: List<DaySummary>,
     val totalMinutes: Long,
+    /** Součet přesčasů (je součástí totalMinutes). */
+    val overtimeMinutes: Long,
     /** Počet neuzavřených směn začínajících v měsíci (do součtu se nepočítají). */
     val openShifts: Int,
 ) {
@@ -184,17 +188,31 @@ object WorkCalc {
             val date = month.atDay(d)
             val pieces = (byDay[date] ?: emptyList<DayPiece>()).sortedBy { it.startInstant }
             val ov = overrides[date]
+            val dayFlags = flags(date)
             DaySummary(
                 date = date,
                 pieces = pieces,
                 minutes = pieces.sumOf { it.minutes },
-                flags = flags(date),
+                overtimeMinutes = if (dayFlags.isEmpty()) pieces.sumOf { overtimeOf(it) } else 0,
+                flags = dayFlags,
                 holidayName = CzechHolidays.name(date),
                 override = ov?.first,
                 overrideNote = ov?.second ?: "",
             )
         }
-        return MonthSummary(month, days, days.sumOf { it.minutes }, open)
+        return MonthSummary(month, days, days.sumOf { it.minutes }, days.sumOf { it.overtimeMinutes }, open)
+    }
+
+    /** Konec běžné pracovní doby v pracovní den; co je odpracováno později, je přesčas. */
+    val OVERTIME_FROM: LocalTime = LocalTime.of(15, 30)
+
+    /** Minuty části intervalu, které leží po 15:30. */
+    fun overtimeOf(piece: DayPiece): Long {
+        val limit = OVERTIME_FROM.toSecondOfDay() / 60
+        val start = piece.start.toSecondOfDay() / 60
+        val end = if (piece.endsAtMidnight) 24 * 60 else piece.end.toSecondOfDay() / 60
+        val after = (end - maxOf(start, limit)).toLong()
+        return after.coerceIn(0L, piece.minutes)
     }
 
     /** 510 -> "8:30", 11160 -> "186:00". */

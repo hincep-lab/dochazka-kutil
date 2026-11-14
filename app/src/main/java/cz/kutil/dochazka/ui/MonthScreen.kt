@@ -100,7 +100,7 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Odpracováno celkem: ${WorkCalc.formatHm(month.totalMinutes)} h", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 val workedDays = month.days.count { it.pieces.isNotEmpty() }
-                Text("Dnů s prací: $workedDays · přesčasy se nevyčíslují (do formuláře se nepíšou)", style = MaterialTheme.typography.bodySmall)
+                Text("Z toho přesčas (po 15:30 v pracovní dny): ${WorkCalc.formatHm(month.overtimeMinutes)} h · dnů s prací: $workedDays", style = MaterialTheme.typography.bodySmall)
                 if (month.openShifts > 0) {
                     Text("Pozor: ${month.openShifts} neuzavřená směna není v součtu.", color = MaterialTheme.colorScheme.error)
                 }
@@ -135,7 +135,7 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Docházka se vyplní do kopie původního formuláře (Pavel_ORIGINAL.docx). Originál se nemění.")
                     Text("${state.settings.organization} · ${state.settings.employee}")
-                    Text("Celkem: ${WorkCalc.formatHm(month.totalMinutes)} h", fontWeight = FontWeight.Bold)
+                    Text("Celkem: ${WorkCalc.formatHm(month.totalMinutes)} h, z toho přesčas ${WorkCalc.formatHm(month.overtimeMinutes)} h", fontWeight = FontWeight.Bold)
                     if (overflow.isNotEmpty()) {
                         Text(
                             "Dny ${overflow.joinToString(", ") { Fmt.dateShort(it.date) }} mají víc než ${DocxExporter.SLOTS_PER_DAY} výjezdy. " +
@@ -230,6 +230,7 @@ fun DayDetailScreen(vm: MainViewModel, state: UiState, date: LocalDate, onBack: 
         day.holidayName?.let { Text("Státní svátek: $it", color = MaterialTheme.colorScheme.tertiary) }
         if (day.workLabels.isNotEmpty()) Text(day.workLabels.joinToString(" · "), color = MaterialTheme.colorScheme.tertiary, fontWeight = FontWeight.Bold)
         Text("Odpracováno: ${WorkCalc.formatHm(day.minutes)} h", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        if (day.overtimeMinutes > 0) Text("Z toho přesčas (po 15:30): ${WorkCalc.formatHm(day.overtimeMinutes)} h")
         if (day.pieces.size > DocxExporter.SLOTS_PER_DAY) {
             Text(
                 "Tento den má víc výjezdů, než má formulář sloupců – v exportu bude „viz příloha“ a všechny intervaly na druhé straně.",

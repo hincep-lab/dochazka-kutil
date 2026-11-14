@@ -192,6 +192,28 @@ class WorkCalcTest {
         assertEquals("D", m.day(20).override!!.code)
     }
 
+    @Test fun prescasJeCasPo1530VPracovniDen() {
+        val shifts = listOf(
+            ShiftData(1, t(2026, 11, 10, 7, 0), t(2026, 11, 10, 17, 0)),   // úterý: 1:30 přesčas
+            ShiftData(2, t(2026, 11, 11, 6, 0), t(2026, 11, 11, 15, 30)),  // středa: dřívější začátek přesčas není
+            ShiftData(3, t(2026, 11, 12, 7, 0), t(2026, 11, 12, 15, 30)),
+            ShiftData(4, t(2026, 11, 12, 17, 0), t(2026, 11, 12, 19, 0)),  // čtvrtek: večerní výjezd 2:00
+            ShiftData(5, t(2026, 11, 14, 14, 0), t(2026, 11, 14, 18, 0)),  // sobota: nepočítá se sem
+            ShiftData(6, t(2026, 11, 17, 14, 0), t(2026, 11, 17, 18, 0)),  // svátek v úterý: není pracovní den
+            ShiftData(7, t(2026, 11, 19, 22, 0), t(2026, 11, 20, 2, 0)),   // čtvrtek 22–24 = 2:00, pátek 0–2 nic
+        )
+        val m = WorkCalc.month(YearMonth.of(2026, 11), shifts)
+        assertEquals(90, m.day(10).overtimeMinutes)
+        assertEquals(0, m.day(11).overtimeMinutes)
+        assertEquals(120, m.day(12).overtimeMinutes)
+        assertEquals(0, m.day(14).overtimeMinutes)
+        assertEquals(0, m.day(17).overtimeMinutes)
+        assertEquals(120, m.day(19).overtimeMinutes)
+        assertEquals(0, m.day(20).overtimeMinutes)
+        assertEquals(330, m.overtimeMinutes)
+        assertEquals(120, WorkCalc.month(DemoData.MONTH, DemoData.november2026()).overtimeMinutes)
+    }
+
     @Test fun formatHodin() {
         assertEquals("8:30", WorkCalc.formatHm(510))
         assertEquals("186:00", WorkCalc.formatHm(11160))

@@ -62,9 +62,10 @@ object DocxExporter {
     private const val C_BREAK1 = 5
     private const val C_HOURS = 11
 
-    /** Proškrtnutí volného víkendu (dlouhé pomlčky splývají v čáru). */
-    const val DASH = "——"
-    const val DASH_WIDE = "———————"
+    // Rozměry pro proškrtnutí (v bodech): šířka sloupců Příchod/Odchod, výška řádku dne, okraj buňky.
+    private const val STRIKE_WIDTH_PT = 397.0
+    private const val ROW_HEIGHT_PT = 13.0
+    private const val CELL_MARGIN_PT = 3.5
 
     // Tabulátory řádku Jméno / Měsíc / Rok (v twipech od levého okraje textu).
     private const val TAB_MONTH = 4300
@@ -119,6 +120,7 @@ object DocxExporter {
 
         // --- dny -----------------------------------------------------------------------
         val overflow = ArrayList<Int>()
+        val freeWeekend = ArrayList<Int>()
         for (day in month.days) {
             val row = rows[day.date.dayOfMonth + 1]
             val pieces = day.pieces
@@ -132,11 +134,7 @@ object DocxExporter {
             }
             val weekend = DayFlag.SATURDAY in day.flags || DayFlag.SUNDAY in day.flags
             val free = pieces.isEmpty() && day.override == null
-            if (free && weekend) {
-                // Volný víkend se proškrtne přes celý řádek.
-                for (c in C_AM_IN until C_HOURS) edits.add(cellText(xml, row.cells[c], DASH, RPR_CELL))
-                edits.add(cellText(xml, row.cells[C_HOURS], DASH_WIDE, RPR_CELL))
-            }
+            if (free && weekend) freeWeekend.add(day.date.dayOfMonth)
             // Svátek ve všední den bez práce: zkratka „S“ podle vysvětlivek a slovně „st. svátek“.
             val freeHoliday = free && !weekend && DayFlag.HOLIDAY in day.flags
             if (freeHoliday) edits.add(cellText(xml, row.cells[C_HOURS], "st. svátek", RPR_CELL))
@@ -163,10 +161,30 @@ object DocxExporter {
             }
         }
 
-        // --- součty (PŘESČAS. HODINY se nevyplňuje – definice není zadaná) --------------
-        val total = WorkCalc.formatHm(month.totalMinutes)
-        edits.add(cellText(xml, rows[33].cells.last(), total, RPR_CELL))
-        edits.add(cellText(xml, rows[35].cells.last(), total, RPR_CELL))
+        // --- proškrtnutí volných víkendů ------------------------------------------------------
+        // Jedna čára z levého dolního do pravého horního rohu přes sloupce Příchod/Odchod;
+        // sobota a neděle jdoucí po sobě se škrtají společně.
+        var i = 0
+        while (i < freeWeekend.size) {
+            var j = i
+            while (j + 1 < freeWeekend.size && freeWeekend[j + 1] == freeWeekend[j] + 1) j++
+            val first = rows[freeWeekend[i] + 1]
+            val pos = insertionPoint(xml, first.cells[C_AM_IN])
+            edits.add(Edit(pos, pos, strikeLine(j - i + 1)))
+            i = j + 1
+        }
+
+        // --- součty: ODPRAC. = běžná doba, PŘESČAS. = po 15:30 v pracovní dny, CELKEM = obojí ----
+        val regular = month.totalMinutes - month.overtimeMinutes
+        edits.add(cellText(xml, rows[33].cells.last(), WorkCalc.formatHm(regular), RPR_CELL))
+        if (month.overtimeMinutes > 0) {
+            // Původní pomlčky v poli PŘESČAS. HODINY se nahradí hodnotou.
+            val cell = rows[34].cells.last()
+            val m = Regex("(<w:t(?: [^>]*)?>)-{3,}(</w:t>)").find(xml.substring(cell.start, cell.end))
+                ?: throw DocxFormatException("Pole PŘESČAS. HODINY nemá očekávaný obsah.")
+            edits.add(Edit(cell.start + m.range.first, cell.start + m.range.last + 1, m.groupValues[1] + WorkCalc.formatHm(month.overtimeMinutes) + m.groupValues[2]))
+        }
+        edits.add(cellText(xml, rows[35].cells.last(), WorkCalc.formatHm(month.totalMinutes), RPR_CELL))
 
         // --- doplňující poznámky ve dvou existujících prázdných odstavcích pod vysvětlivkami ---
         val labelNote = buildLabelNote(month)
@@ -341,6 +359,16 @@ object DocxExporter {
     // ---------------------------------------------------------------------------------------
     // Pomocné funkce
     // ---------------------------------------------------------------------------------------
+
+    /** Plovoucí čára ukotvená v první buňce Příchod; neposouvá text ani výšku řádku. */
+    private fun strikeLine(rowCount: Int): String {
+        val x1 = -CELL_MARGIN_PT
+        val x2 = STRIKE_WIDTH_PT - CELL_MARGIN_PT
+        val y = ROW_HEIGHT_PT * rowCount
+        return "<w:r w:rsidR=\"$MARK\"><w:pict><v:line style=\"position:absolute;z-index:251660288;" +
+            "mso-position-horizontal-relative:text;mso-position-vertical-relative:text\" " +
+            "from=\"${x1}pt,${y}pt\" to=\"${x2}pt,0pt\" strokecolor=\"black\" strokeweight=\".75pt\"/></w:pict></w:r>"
+    }
 
     private fun cellText(xml: String, cell: Cell, text: String, rPr: String): Edit {
         val pos = insertionPoint(xml, cell)

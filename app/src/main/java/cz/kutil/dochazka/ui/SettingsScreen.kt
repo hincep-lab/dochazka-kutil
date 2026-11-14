@@ -157,7 +157,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState) {
                     "• Domácí Wi-Fi je jen pojistka. To, že název sítě nejde přečíst, se nikdy nebere jako důkaz, že nejsi doma.\n" +
                     "• Nic se nezapíše bez tvého ANO. Všechny časy jdou opravit, původně zaznamenané časy zůstávají uložené.\n" +
                     "• Časy do výkazu se zaokrouhlují na půlhodiny (6:50 → 7:00, 15:40 → 15:30, čtvrt a tři čtvrtě nahoru).\n" +
-                    "• Přesčasy, příplatky ani právní nároky aplikace nepočítá.",
+                    "• Přesčas = čas odpracovaný po 15:30 v pracovní dny (po–pá mimo svátky). Příplatky ani právní nároky aplikace nepočítá.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }

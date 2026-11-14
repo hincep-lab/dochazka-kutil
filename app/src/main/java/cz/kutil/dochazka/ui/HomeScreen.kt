@@ -154,6 +154,7 @@ fun HomeScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Unit
         // --- měsíc ------------------------------------------------------------------------
         SectionCard(Fmt.month(month.month)) {
             Text("Odpracováno: ${WorkCalc.formatHm(month.totalMinutes)} h", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text("Z toho přesčas: ${WorkCalc.formatHm(month.overtimeMinutes)} h")
             if (month.openShifts > 0) Text("Neuzavřené směny se do součtu nepočítají (${month.openShifts}).", style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = { onOpenTab(Tab.MONTH) }) { Text("Přehled měsíce a export") }
         }
