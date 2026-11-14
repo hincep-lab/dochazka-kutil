@@ -15,7 +15,10 @@ import cz.kutil.dochazka.core.PRAGUE
 import cz.kutil.dochazka.core.Rounding
 import cz.kutil.dochazka.core.TrackEvent
 import cz.kutil.dochazka.core.WorkCalc
+import androidx.core.content.FileProvider
+import cz.kutil.dochazka.data.AppPrefs
 import cz.kutil.dochazka.data.Backup
+import java.io.File
 import cz.kutil.dochazka.data.DayOverrideEntity
 import cz.kutil.dochazka.data.Graph
 import cz.kutil.dochazka.data.HomeZoneEntity
@@ -71,11 +74,16 @@ data class UiState(
         shifts.filter { it.id != exceptId }.mapNotNull { WorkCalc.effective(it.toData()) }.filter { it.end.isAfter(it.start) }
 }
 
+data class ShareRequest(val uri: Uri, val email: String, val subject: String, val body: String)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val ctx: Application get() = getApplication()
 
     val message = MutableStateFlow<String?>(null)
+
+    /** Požadavek na otevření e-mailu s přiloženým výkazem (zpracuje ho obrazovka). */
+    val share = MutableStateFlow<ShareRequest?>(null)
     val selectedMonth = MutableStateFlow(YearMonth.now(PRAGUE))
 
     val state: StateFlow<UiState> = Graph.demoFlow(app).flatMapLatest { demo ->
@@ -243,6 +251,34 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val extra = if (report.overflowDays.isEmpty()) "" else
             " Pozor: dny ${report.overflowDays.joinToString(", ") { "$it." }} mají víc výjezdů, než má formulář sloupců – jsou vypsané v příloze na druhé straně."
         message.value = "Export uložen (${report.fileName}), celkem ${WorkCalc.formatHm(report.totalMinutes)} h.$extra"
+    }
+
+    /**
+     * Vyplní formulář do dočasného souboru a otevře výběr e-mailové aplikace s přílohou.
+     * Samotné odeslání potvrzuje uživatel ve své poštovní aplikaci – aplikace sama nic neposílá.
+     */
+    fun shareByEmail(ym: YearMonth) = launchSafe {
+        val st = state.value
+        val (file, report) = withContext(Dispatchers.IO) {
+            val template = ctx.assets.open(TEMPLATE_ASSET).use { it.readBytes() }
+            val (bytes, rep) = DocxExporter.export(template, st.month(ym), ExportHeader(st.settings.organization, st.settings.employee))
+            val dir = File(ctx.cacheDir, "exports").apply { mkdirs() }
+            dir.listFiles()?.forEach { it.delete() }
+            val f = File(dir, rep.fileName)
+            f.writeBytes(bytes)
+            f to rep
+        }
+        val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", file)
+        val monthName = DocxExporter.MONTHS[ym.monthValue - 1]
+        val total = WorkCalc.formatHm(report.totalMinutes)
+        val extra = if (report.overflowDays.isEmpty()) "" else
+            "\nDny ${report.overflowDays.joinToString(", ") { "$it." }} mají více výjezdů – jsou rozepsané v příloze na druhé straně."
+        share.value = ShareRequest(
+            uri = uri,
+            email = AppPrefs.reportEmail(ctx),
+            subject = "Docházka $monthName ${ym.year} – ${st.settings.employee}",
+            body = "Dobrý den,\n\nv příloze posílám docházku za $monthName ${ym.year}. Odpracováno celkem $total h.$extra\n\n${st.settings.employee}",
+        )
     }
 
     fun backup(uri: Uri) = launchSafe {

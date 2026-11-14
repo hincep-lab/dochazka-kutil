@@ -2,6 +2,8 @@
 
 package cz.kutil.dochazka.ui
 
+import android.content.ClipData
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,8 +38,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
+import java.time.YearMonth
 
 enum class Tab(val label: String) { HOME("Dnes"), MONTH("Měsíc"), PENDING("Návrhy"), SETTINGS("Nastavení") }
 
@@ -57,10 +61,38 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
         }
     }
     LaunchedEffect(requestedTab.value) {
-        if (requestedTab.value == "pending") {
+        val requested = requestedTab.value
+        if (requested == "pending") {
             tab = Tab.PENDING
             detailDate = null
             requestedTab.value = null
+        } else if (requested != null && requested.startsWith("month")) {
+            runCatching { YearMonth.parse(requested.substringAfter("month:", "")) }.getOrNull()?.let { vm.selectedMonth.value = it }
+            tab = Tab.MONTH
+            detailDate = null
+            requestedTab.value = null
+        }
+    }
+    val share by vm.share.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(share) {
+        val req = share
+        if (req != null) {
+            vm.share.value = null
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = DOCX_MIME
+                putExtra(Intent.EXTRA_STREAM, req.uri)
+                if (req.email.isNotBlank()) putExtra(Intent.EXTRA_EMAIL, arrayOf(req.email))
+                putExtra(Intent.EXTRA_SUBJECT, req.subject)
+                putExtra(Intent.EXTRA_TEXT, req.body)
+                clipData = ClipData.newRawUri("Docházka", req.uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            try {
+                context.startActivity(Intent.createChooser(intent, "Odeslat docházku"))
+            } catch (e: Exception) {
+                vm.message.value = "V telefonu není aplikace, kterou by šlo výkaz odeslat."
+            }
         }
     }
 

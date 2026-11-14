@@ -28,7 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import cz.kutil.dochazka.core.PRAGUE
+import cz.kutil.dochazka.data.AppPrefs
 import java.time.LocalDate
 
 @Composable
@@ -38,6 +41,8 @@ fun SettingsScreen(vm: MainViewModel, state: UiState) {
     var organization by rememberSaveable(state.settings.organization) { mutableStateOf(state.settings.organization) }
     var employee by rememberSaveable(state.settings.employee) { mutableStateOf(state.settings.employee) }
     var zoneEditing by rememberSaveable { mutableStateOf(false) }
+    var reminder by remember { mutableStateOf(AppPrefs.reminderEnabled(context)) }
+    var email by rememberSaveable { mutableStateOf(AppPrefs.reportEmail(context)) }
     var restoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
     val backupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -90,6 +95,33 @@ fun SettingsScreen(vm: MainViewModel, state: UiState) {
                     OutlinedButton(onClick = { zoneEditing = true }) { Text("Změnit zónu nebo Wi-Fi") }
                 }
             }
+        }
+
+        SectionCard("Měsíční uzávěrka") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Připomenout 1. den v měsíci", Modifier.weight(1f))
+                Switch(checked = reminder, onCheckedChange = {
+                    reminder = it
+                    AppPrefs.setReminderEnabled(context, it)
+                })
+            }
+            Text(
+                "Prvního (po 7. hodině) přijde oznámení. Klepnutím otevřeš přehled minulého měsíce, projdeš dny, doplníš co chybí " +
+                    "a výkaz odešleš e-mailem nebo uložíš. Když je telefon prvního vypnutý, připomenutí přijde dodatečně.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("E-mail, kam se výkaz posílá") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(onClick = {
+                AppPrefs.setReportEmail(context, email)
+                vm.message.value = "E-mail uložen."
+            }) { Text("Uložit e-mail") }
         }
 
         SectionCard("Záloha a obnova") {

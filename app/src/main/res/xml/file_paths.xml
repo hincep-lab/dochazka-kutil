@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dočasná kopie vyplněného výkazu pro odeslání e-mailem (jen mezipaměť aplikace). -->
+<paths>
+    <cache-path name="exports" path="exports/" />
+</paths>

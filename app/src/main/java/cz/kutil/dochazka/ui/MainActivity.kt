@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        requestedTab.value = intent?.getStringExtra(Notifier.EXTRA_OPEN_TAB)
+        requestedTab.value = requested(intent)
         setContent {
             DochazkaTheme {
                 AppRoot(vm, requestedTab)
@@ -26,9 +26,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** "pending" nebo "month:2026-10" podle toho, na které oznámení uživatel klepl. */
+    private fun requested(intent: Intent?): String? {
+        val tab = intent?.getStringExtra(Notifier.EXTRA_OPEN_TAB) ?: return null
+        val month = intent.getStringExtra(Notifier.EXTRA_MONTH)
+        return if (tab == "month" && month != null) "month:$month" else tab
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        requestedTab.value = intent.getStringExtra(Notifier.EXTRA_OPEN_TAB)
+        requestedTab.value = requested(intent)
     }
 
     override fun onResume() {

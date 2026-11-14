@@ -21,6 +21,9 @@ import java.time.format.DateTimeFormatter
 /** Potvrzovací oznámení „Začal jsi pracovat?“ / „Ukončil jsi práci?“ s akcemi ANO / NE. */
 object Notifier {
     const val CHANNEL = "attendance_prompts"
+    const val CHANNEL_MONTHLY = "monthly_report"
+    const val EXTRA_MONTH = "open_month"
+    private const val MONTHLY_ID = 500
     const val EXTRA_PENDING_ID = "pending_id"
     const val EXTRA_YES = "yes"
     const val EXTRA_OPEN_TAB = "open_tab"
@@ -33,6 +36,39 @@ object Notifier {
         val channel = NotificationChannel(CHANNEL, "Potvrzení docházky", NotificationManager.IMPORTANCE_HIGH)
         channel.description = "Dotazy na začátek a konec práce při odchodu z domova a návratu."
         nm.createNotificationChannel(channel)
+        val monthly = NotificationChannel(CHANNEL_MONTHLY, "Měsíční uzávěrka", NotificationManager.IMPORTANCE_DEFAULT)
+        monthly.description = "Připomenutí prvního dne v měsíci: zkontrolovat a odeslat docházku za minulý měsíc."
+        nm.createNotificationChannel(monthly)
+    }
+
+    /** Připomenutí měsíční uzávěrky. Vrací false, pokud oznámení nejde zobrazit. */
+    fun showMonthly(ctx: Context, month: java.time.YearMonth, totalMinutes: Long, openShifts: Int): Boolean {
+        if (!canNotify(ctx)) return false
+        ensureChannel(ctx)
+        val name = cz.kutil.dochazka.core.DocxExporter.MONTHS[month.monthValue - 1]
+        val open = PendingIntent.getActivity(
+            ctx, MONTHLY_ID,
+            Intent(ctx, MainActivity::class.java).putExtra(EXTRA_OPEN_TAB, "month").putExtra(EXTRA_MONTH, month.toString())
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val text = "Odpracováno ${cz.kutil.dochazka.core.WorkCalc.formatHm(totalMinutes)} h." +
+            (if (openShifts > 0) " Pozor, je tam neuzavřená směna." else "") +
+            " Klepni, projdi dny, doplň co chybí a odešli e-mailem."
+        val builder = NotificationCompat.Builder(ctx, CHANNEL_MONTHLY)
+            .setSmallIcon(R.drawable.ic_notif)
+            .setContentTitle("Docházka za $name ${month.year} – zkontrolovat a odeslat")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(open)
+        return try {
+            NotificationManagerCompat.from(ctx).notify(MONTHLY_ID, builder.build())
+            true
+        } catch (e: SecurityException) {
+            false
+        }
     }
 
     fun canNotify(ctx: Context): Boolean {

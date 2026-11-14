@@ -105,7 +105,7 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
                     Text("Pozor: ${month.openShifts} neuzavřená směna není v součtu.", color = MaterialTheme.colorScheme.error)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = { exportDialog = true }) { Text("Export do Wordu") }
+                    Button(onClick = { exportDialog = true }) { Text("Export / odeslat") }
                     FilterChip(
                         selected = onlyUnconfirmed,
                         onClick = { onlyUnconfirmed = !onlyUnconfirmed },
@@ -132,7 +132,7 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
             onDismissRequest = { exportDialog = false },
             title = { Text("Export – ${Fmt.month(ym)}") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Docházka se vyplní do kopie původního formuláře (Pavel_ORIGINAL.docx). Originál se nemění.")
                     Text("${state.settings.organization} · ${state.settings.employee}")
                     Text("Celkem: ${WorkCalc.formatHm(month.totalMinutes)} h", fontWeight = FontWeight.Bold)
@@ -150,15 +150,21 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
+                    Button(onClick = {
+                        exportDialog = false
+                        vm.shareByEmail(ym)
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Odeslat e-mailem") }
+                    OutlinedButton(onClick = {
+                        exportDialog = false
+                        exportLauncher.launch(DocxExporter.fileName(ym))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Uložit do telefonu") }
+                    Text(
+                        "E-mail se otevře ve tvé poštovní aplikaci s přiloženým výkazem; odeslání potvrdíš tam. Příjemce nastavíš v Nastavení.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             },
-            confirmButton = {
-                Button(onClick = {
-                    exportDialog = false
-                    exportLauncher.launch(DocxExporter.fileName(ym))
-                }) { Text("Vybrat umístění a uložit") }
-            },
-            dismissButton = { TextButton(onClick = { exportDialog = false }) { Text("Zrušit") } },
+            confirmButton = { TextButton(onClick = { exportDialog = false }) { Text("Zavřít") } },
         )
     }
 }

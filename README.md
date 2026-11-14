@@ -56,6 +56,13 @@ validuje; pokud by neodpovídala, export skončí chybou místo zápisu naslepo.
 - dovolená, nemoc, lékař… → zkratka podle vysvětlivek formuláře (D, N, P, NV…), bez hodin
 - `PŘESČAS. HODINY` se nevyplňuje (definice přesčasu není zadaná)
 
+### Měsíční uzávěrka
+
+Prvního dne v měsíci (po 7:00) přijde připomenutí. Otevře přehled minulého měsíce, kde jdou dny projít
+a doplnit. Tlačítko **Export / odeslat → Odeslat e-mailem** vyplní formulář a otevře poštovní aplikaci
+s přílohou a předvyplněným příjemcem (Nastavení → Měsíční uzávěrka). Aplikace sama nic neodesílá a nemá
+oprávnění k internetu.
+
 ### Reálné limity Androidu
 
 - Přechody zóny chodí se zpožděním (běžně 1–5 min), výjimečně vůbec. Proto se nic nezapisuje
