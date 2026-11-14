@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cz.kutil.dochazka.core.OverrideType
 import cz.kutil.dochazka.core.PRAGUE
 import cz.kutil.dochazka.core.Rounding
 import cz.kutil.dochazka.core.TrackState
@@ -66,6 +67,7 @@ fun HomeScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Unit
     val day = month.day(today.dayOfMonth)
     val open = state.openShift
     var addDialog by remember { mutableStateOf(false) }
+    var vacationDialog by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -136,6 +138,9 @@ fun HomeScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Unit
             BigButton("Přidat výjezd", primary = false, modifier = Modifier.weight(1f)) { addDialog = true }
             BigButton("Opravit čas", primary = false, modifier = Modifier.weight(1f)) { onOpenDay(today) }
         }
+        OutlinedButton(onClick = { vacationDialog = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+            Text("Dovolená", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        }
 
         // --- dnešek -----------------------------------------------------------------------
         SectionCard("Dnes – ${Fmt.dowLong(today)} ${Fmt.date(today)}") {
@@ -155,9 +160,22 @@ fun HomeScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Unit
         SectionCard(Fmt.month(month.month)) {
             Text("Odpracováno: ${WorkCalc.formatHm(month.totalMinutes)} h", fontWeight = FontWeight.Bold, fontSize = 20.sp)
             Text("Z toho přesčas: ${WorkCalc.formatHm(month.overtimeMinutes)} h")
+            val vacationDays = month.days.count { it.override == OverrideType.DOVOLENA }
+            if (vacationDays > 0) Text("Dovolená: $vacationDays dní")
             if (month.openShifts > 0) Text("Neuzavřené směny se do součtu nepočítají (${month.openShifts}).", style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = { onOpenTab(Tab.MONTH) }) { Text("Přehled měsíce a export") }
         }
+    }
+
+    if (vacationDialog) {
+        VacationDialog(
+            initial = today,
+            onDismiss = { vacationDialog = false },
+            onApply = { from, to, skipFree, remove ->
+                vm.setVacation(from, to, skipFree, remove)
+                vacationDialog = false
+            },
+        )
     }
 
     if (addDialog) {

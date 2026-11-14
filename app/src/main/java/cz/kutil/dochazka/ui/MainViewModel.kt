@@ -163,6 +163,36 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         else dao().upsertOverride(DayOverrideEntity(date.toString(), type.name, note.trim()))
     }
 
+    /**
+     * Dovolená na jeden den nebo na období. skipFree = víkendy a svátky se vynechají.
+     * remove = dovolenou v období zrušit (jiná označení dnů zůstanou).
+     */
+    fun setVacation(from: LocalDate, to: LocalDate, skipFree: Boolean, remove: Boolean) = launchSafe {
+        val start = if (to.isBefore(from)) to else from
+        val end = if (to.isBefore(from)) from else to
+        var count = 0
+        val d = db()
+        d.withTransaction {
+            val dao = d.dao()
+            val existing = dao.allOverrides().associateBy { it.date }
+            var day = start
+            while (!day.isAfter(end) && count < 370) {
+                val key = day.toString()
+                if (remove) {
+                    if (existing[key]?.type == OverrideType.DOVOLENA.name) {
+                        dao.deleteOverride(key)
+                        count++
+                    }
+                } else if (!skipFree || WorkCalc.flags(day).isEmpty()) {
+                    dao.upsertOverride(DayOverrideEntity(key, OverrideType.DOVOLENA.name, ""))
+                    count++
+                }
+                day = day.plusDays(1)
+            }
+        }
+        message.value = if (remove) "Dovolená zrušena: $count dní." else "Dovolená zapsána: $count dní."
+    }
+
     // --- nastavení -----------------------------------------------------------------------
 
     private suspend fun updateSettings(db: cz.kutil.dochazka.data.AppDatabase, change: (SettingsEntity) -> SettingsEntity) {

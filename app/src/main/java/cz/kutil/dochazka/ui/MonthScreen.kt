@@ -78,6 +78,7 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
     val unconfirmed = remember(state.pending, state.shifts) { unconfirmedDates(state) }
     var onlyUnconfirmed by rememberSaveable { mutableStateOf(false) }
     var exportDialog by remember { mutableStateOf(false) }
+    var vacationDialog by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(DOCX_MIME)) { uri ->
         if (uri != null) vm.export(uri, ym)
@@ -112,6 +113,11 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
                         label = { Text("Jen nepotvrzené") },
                     )
                 }
+                val vacationDays = month.days.count { it.override == OverrideType.DOVOLENA }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(onClick = { vacationDialog = true }) { Text("Dovolená") }
+                    if (vacationDays > 0) Text("V tomto měsíci: $vacationDays dní")
+                }
             }
         }
         if (days.isEmpty()) {
@@ -123,6 +129,18 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
                 HorizontalDivider()
             }
         }
+    }
+
+    if (vacationDialog) {
+        val today = Fmt.today()
+        VacationDialog(
+            initial = if (YearMonth.from(today) == ym) today else ym.atDay(1),
+            onDismiss = { vacationDialog = false },
+            onApply = { from, to, skipFree, remove ->
+                vm.setVacation(from, to, skipFree, remove)
+                vacationDialog = false
+            },
+        )
     }
 
     if (exportDialog) {
@@ -185,7 +203,7 @@ private fun DayRow(d: DaySummary, unconfirmed: Boolean, onClick: () -> Unit) {
         }
         Column(Modifier.weight(1f)) {
             if (d.pieces.isNotEmpty()) Text(d.pieces.joinToString(",  ") { "${it.startText()}–${it.endText()}" })
-            d.override?.let { Text("${it.code} – ${it.label}", style = MaterialTheme.typography.bodySmall) }
+            d.override?.let { Text(if (it == OverrideType.DOVOLENA) "Dovolená" else "${it.code} – ${it.label}", style = MaterialTheme.typography.bodySmall) }
             if (d.workLabels.isNotEmpty()) {
                 Text(d.workLabels.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
             } else if (DayFlag.HOLIDAY in d.flags) {

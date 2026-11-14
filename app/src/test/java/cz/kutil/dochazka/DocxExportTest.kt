@@ -175,7 +175,8 @@ class DocxExportTest {
         val shifts = listOf(ShiftData(1, DemoData.at(LocalDate.of(2026, 11, 24), 10, 0), DemoData.at(LocalDate.of(2026, 11, 24), 15, 30)))
         val (out, report) = DocxExporter.export(template(), WorkCalc.month(DemoData.MONTH, shifts, ov), header)
         val t = table(doc(out))
-        assertEquals(listOf("20", "D", "", "", "", "", "", "", "", "", "", ""), t[21])
+        // dovolená se píše slovem do sloupce hodin, bez zkratky a bez hodin
+        assertEquals(listOf("20", "", "", "", "", "", "", "", "", "", "", "Dovolená"), t[21])
         assertEquals("N", t[24][1])
         // lékař + odpracovaný zbytek dne: zkratka v dalším volném poli, hodiny jen za práci
         assertEquals(listOf("24", "10:00", "15:30", "P", "", "", "", "", "", "", "", "5:30"), t[25])

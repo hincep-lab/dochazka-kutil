@@ -47,6 +47,47 @@ fun pickDate(context: Context, initial: LocalDate, onPicked: (LocalDate) -> Unit
     DatePickerDialog(context, { _, y, m, d -> onPicked(LocalDate.of(y, m + 1, d)) }, initial.year, initial.monthValue - 1, initial.dayOfMonth).show()
 }
 
+/** Zadání dovolené: jeden den (Od = Do) nebo celé období. */
+@Composable
+fun VacationDialog(initial: LocalDate, onDismiss: () -> Unit, onApply: (from: LocalDate, to: LocalDate, skipFree: Boolean, remove: Boolean) -> Unit) {
+    val context = LocalContext.current
+    var from by remember { mutableStateOf(initial) }
+    var to by remember { mutableStateOf(initial) }
+    var skipFree by remember { mutableStateOf(true) }
+    val start = if (to.isBefore(from)) to else from
+    val end = if (to.isBefore(from)) from else to
+    var days = 0
+    var d = start
+    while (!d.isAfter(end) && days < 370) {
+        if (!skipFree || WorkCalc.flags(d).isEmpty()) days++
+        d = d.plusDays(1)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Dovolená") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Vyber první a poslední den. Pro jediný den nech obě data stejná.")
+                OutlinedButton(onClick = { pickDate(context, from) { from = it; if (to.isBefore(it)) to = it } }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Od: ${Fmt.dowLong(from)} ${Fmt.date(from)}")
+                }
+                OutlinedButton(onClick = { pickDate(context, to) { to = it } }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Do: ${Fmt.dowLong(to)} ${Fmt.date(to)}")
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Vynechat víkendy a svátky", Modifier.weight(1f))
+                    Switch(checked = skipFree, onCheckedChange = { skipFree = it })
+                }
+                Text("Zapíše se dní: $days", fontWeight = FontWeight.Bold)
+                Text("Ve výkazu bude u těchto dnů slovo „Dovolená“, bez odpracovaných hodin.", style = MaterialTheme.typography.bodySmall)
+                Button(enabled = days > 0, onClick = { onApply(from, to, skipFree, false) }, modifier = Modifier.fillMaxWidth()) { Text("Zapsat dovolenou") }
+                OutlinedButton(onClick = { onApply(from, to, skipFree, true) }, modifier = Modifier.fillMaxWidth()) { Text("Zrušit dovolenou v tomto období") }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Zavřít") } },
+    )
+}
+
 /** Podklad pro dialog přidání / opravy intervalu. */
 data class ShiftDraft(
     val id: Long?,

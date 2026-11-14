@@ -137,8 +137,9 @@ object DocxExporter {
             if (free && weekend) freeWeekend.add(day.date.dayOfMonth)
             // Svátek ve všední den bez práce: zkratka „S“ podle vysvětlivek a slovně „st. svátek“.
             val freeHoliday = free && !weekend && DayFlag.HOLIDAY in day.flags
-            if (freeHoliday) edits.add(cellText(xml, row.cells[C_HOURS], "st. svátek", RPR_CELL))
-            val code = day.override?.code ?: if (freeHoliday) "S" else null
+            // Dovolená se píše slovem do sloupce hodin (do úzkých sloupců Příchod/Odchod se nevejde).
+            val vacation = day.override == OverrideType.DOVOLENA
+            val code = if (vacation) null else day.override?.code ?: if (freeHoliday) "S" else null
             if (code != null) {
                 val target = when (pieces.size) {
                     0 -> C_AM_IN
@@ -147,17 +148,22 @@ object DocxExporter {
                 }
                 edits.add(cellText(xml, row.cells[target], code, RPR_CELL))
             }
+            val hours = StringBuilder()
             if (pieces.isNotEmpty()) {
-                val hoursCell = row.cells[C_HOURS]
+                hours.append(run(WorkCalc.formatHm(day.minutes), RPR_CELL))
                 if (pieces.size > SLOTS_PER_DAY) {
                     overflow.add(day.date.dayOfMonth)
-                    val pos = insertionPoint(xml, hoursCell)
-                    edits.add(
-                        Edit(pos, pos, run(WorkCalc.formatHm(day.minutes), RPR_CELL) + run("  viz příloha", RPR_CELL_SMALL))
-                    )
-                } else {
-                    edits.add(cellText(xml, hoursCell, WorkCalc.formatHm(day.minutes), RPR_CELL))
+                    hours.append(run("  viz příloha", RPR_CELL_SMALL))
                 }
+                if (vacation) hours.append(run("  dovolená", RPR_CELL_SMALL))
+            } else if (vacation) {
+                hours.append(run("Dovolená", RPR_CELL))
+            } else if (freeHoliday) {
+                hours.append(run("st. svátek", RPR_CELL))
+            }
+            if (hours.isNotEmpty()) {
+                val pos = insertionPoint(xml, row.cells[C_HOURS])
+                edits.add(Edit(pos, pos, hours.toString()))
             }
         }
 
