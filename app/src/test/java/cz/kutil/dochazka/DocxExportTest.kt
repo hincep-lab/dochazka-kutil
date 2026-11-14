@@ -94,9 +94,9 @@ class DocxExportTest {
         val text = DocxExporter.text(xml)
         assertTrue(text.contains("EVIDENCE DOCHÁZKY"))
         assertTrue(text.contains("ORGANIZACE:   Vodoinstalace Kutil s.r.o."))
-        assertTrue(text.contains("Jméno : Hink"))
+        assertTrue(text.contains("Jméno: Hink"))
         assertTrue(text.contains("Měsíc: listopad"))
-        assertTrue(text.contains("Rok:  2026"))
+        assertTrue(text.contains("Rok: 2026"))
         assertFalse(text.contains("2021"))
         assertTrue(text.contains("Práce v sobotu: 14. 11."))
         assertTrue(text.contains("Práce v neděli: 15. 11."))
@@ -123,8 +123,10 @@ class DocxExportTest {
         }
         // Po odebrání vložených běhů musí být dokument totožný s originálem – kromě řádku Jméno/Měsíc/Rok.
         val stripped = nXml.replace(Regex("<w:r w:rsidR=\"${DocxExporter.MARK}\">[\\s\\S]*?</w:r>"), "")
-        val cutO = oXml.indexOf("Jméno :").let { oXml.substring(0, it) to oXml.substring(oXml.indexOf("</w:p>", it)) }
-        val cutN = stripped.indexOf("Jméno :").let { stripped.substring(0, it) to stripped.substring(stripped.indexOf("</w:p>", it)) }
+        // porovnává se vše před odstavcem Jméno/Měsíc/Rok a vše za ním
+        fun cut(x: String, needle: String) = x.indexOf(needle).let { x.substring(0, x.lastIndexOf("<w:p ", it)) to x.substring(x.indexOf("</w:p>", it)) }
+        val cutO = cut(oXml, "Jméno :")
+        val cutN = cut(stripped, "Jméno:")
         assertEquals(cutO.first, cutN.first)
         assertEquals(cutO.second, cutN.second)
         // výstup je dobře utvořené XML
@@ -193,8 +195,8 @@ class DocxExportTest {
         assertEquals("Dochazka_2027-02.docx", report.fileName)
         val text = DocxExporter.text(doc(out))
         assertTrue(text.contains("Měsíc: únor"))
-        assertTrue(text.contains("Rok:  2027"))
-        assertTrue(text.contains("Jméno : Jan Novák-Dlouhý"))
+        assertTrue(text.contains("Rok: 2027"))
+        assertTrue(text.contains("Jméno: Jan Novák-Dlouhý"))
         assertEquals("0:00", table(doc(out))[35].last())
     }
 

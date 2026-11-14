@@ -62,6 +62,10 @@ object DocxExporter {
     private const val C_BREAK1 = 5
     private const val C_HOURS = 11
 
+    // Tabulátory řádku Jméno / Měsíc / Rok (v twipech od levého okraje textu).
+    private const val TAB_MONTH = 4300
+    private const val TAB_YEAR = 7900
+
     private const val ARIAL = "<w:rFonts w:ascii=\"Arial\" w:cs=\"Arial\" w:eastAsia=\"Arial\" w:hAnsi=\"Arial\"/>"
     private const val RPR_CELL = "$ARIAL<w:b w:val=\"1\"/>"
     private const val RPR_CELL_SMALL = "$ARIAL<w:sz w:val=\"14\"/><w:szCs w:val=\"14\"/>"
@@ -234,13 +238,20 @@ object DocxExporter {
             "(" + Regex.escape(t) + ")Jméno :[^<]*(</w:t>(?:<w:tab/>)*" + Regex.escape(t) + ")[^<]*Měsíc:[^<]*Rok:[^<]*" +
                 "(</w:t></w:r><w:r [^>]*><w:rPr>[\\s\\S]*?</w:rPr>" + Regex.escape(t) + ")\\d+(</w:t>)"
         )
-        val m = re.find(p) ?: throw DocxFormatException("Řádek Jméno / Měsíc / Rok neodpovídá originálu.")
+        re.find(p) ?: throw DocxFormatException("Řádek Jméno / Měsíc / Rok neodpovídá originálu.")
+        // Originál má tři údaje oddělené mezerami, takže se po vyplnění rozjíždějí. Řádek se proto
+        // skládá znovu: stejné písmo jako v originálu, ale údaje zarovnané na pevné tabulátory.
+        val openEnd = p.indexOf('>') + 1
+        val rPr = Regex("<w:r [^>]*><w:rPr>([\\s\\S]*?)</w:rPr>").find(p)?.groupValues?.get(1)
+            ?: throw DocxFormatException("Řádek Jméno / Měsíc / Rok nemá očekávané písmo.")
         val monthName = MONTHS[month.monthValue - 1]
-        val namePart = "Jméno : " + employee.padEnd(maxOf(employee.length + 2, 26 - employee.length))
-        val gap = " ".repeat(maxOf(4, 21 - 2 * monthName.length))
-        val replacement = m.groupValues[1] + esc(namePart) + m.groupValues[2] + "  Měsíc: " + monthName + gap + "Rok:  " +
-            m.groupValues[3] + month.year + m.groupValues[4]
-        return Edit(pStart + m.range.first, pStart + m.range.last + 1, replacement)
+        val content = "<w:pPr><w:tabs><w:tab w:val=\"left\" w:pos=\"$TAB_MONTH\"/><w:tab w:val=\"left\" w:pos=\"$TAB_YEAR\"/></w:tabs>" +
+            "<w:rPr><w:vertAlign w:val=\"baseline\"/></w:rPr></w:pPr>" +
+            "<w:r><w:rPr>$rPr</w:rPr>" +
+            t + "Jméno: " + esc(employee) + "</w:t><w:tab/>" +
+            t + "Měsíc: " + monthName + "</w:t><w:tab/>" +
+            t + "Rok: " + month.year + "</w:t></w:r>"
+        return Edit(pStart + openEnd, pEnd, content)
     }
 
     /** Dva prázdné odstavce, které originál má pod vysvětlivkami – poznámka se píše do nich, nic se nepřidává. */
