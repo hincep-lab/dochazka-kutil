@@ -1,0 +1,12 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+.kotlin/
+# podpisové klíče pro vydání do repozitáře nepatří (debug klíč v keystore/ je záměrně přiložen)
+*.jks

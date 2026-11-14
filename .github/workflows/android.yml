@@ -1,0 +1,62 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit testy
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Sestavení debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Pojmenovat APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk "out/DochazkaKutil-${{ github.run_number }}.apk"
+          ls -la out
+
+      - name: Výsledky testů
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests
+          if-no-files-found: ignore
+
+      - name: Artefakt APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DochazkaKutil-apk
+          path: out/*.apk
+
+      - name: Vydání (Release) s APK ke stažení
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "build-${{ github.run_number }}" out/*.apk \
+            --title "Docházka Kutil – sestavení ${{ github.run_number }}" \
+            --notes "Automatické sestavení z commitu ${{ github.sha }}. Stáhni soubor .apk níže a nainstaluj ho v telefonu." \
+            --latest
