@@ -116,7 +116,8 @@ class DocxExportTest {
         for ((name, bytes) in a) {
             if (name != DocxExporter.DOCUMENT) assertArrayEquals("Soubor $name se změnil", bytes, b[name])
         }
-        val oXml = String(a[DocxExporter.DOCUMENT]!!, Charsets.UTF_8)
+        // jediná povolená změna mimo vložený text: odebrání prázdného číslování (neviditelný tabulátor u nadpisu)
+        val oXml = String(a[DocxExporter.DOCUMENT]!!, Charsets.UTF_8).replace(DocxExporter.NUM_PR, "")
         val nXml = String(b[DocxExporter.DOCUMENT]!!, Charsets.UTF_8)
         for (tag in listOf("<w:tbl>", "<w:tr>", "<w:tc>", "<w:gridSpan", "<w:vMerge", "<w:tcBorders>", "<w:gridCol", "<w:p ", "<w:p>", "<w:sectPr")) {
             assertEquals("Počet $tag", count(oXml, tag), count(nXml, tag))
@@ -129,6 +130,7 @@ class DocxExportTest {
         val cutN = cut(stripped, "Jméno:")
         assertEquals(cutO.first, cutN.first)
         assertEquals(cutO.second, cutN.second)
+        assertEquals(0, count(nXml, "<w:numPr>"))
         // výstup je dobře utvořené XML
         javax.xml.parsers.DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
             .newDocumentBuilder().parse(ByteArrayInputStream(b[DocxExporter.DOCUMENT]))

@@ -174,6 +174,12 @@ object DocxExporter {
             edits.add(Edit(pos, pos, appendix(month, header, overflow)))
         }
 
+        // --- prázdné číslování z originálu ----------------------------------------------------
+        // Nadpis a několik popisků mají v originálu „číslování“ bez čísla. Některé prohlížeče za něj
+        // vkládají tabulátor, takže se nadpis posune z osy a podtržení začíná už před textem.
+        // Odebrání nemění text ani tabulku, jen tento neviditelný tabulátor.
+        for (m in NUM_PR.findAll(xml)) edits.add(Edit(m.range.first, m.range.last + 1, ""))
+
         val sb = StringBuilder(xml)
         // Stejná pozice = zachovat pořadí vložení, proto stabilní řazení sestupně podle pozice.
         val ordered = edits.withIndex().sortedWith(compareByDescending<IndexedValue<Edit>> { it.value.start }.thenByDescending { it.index })
@@ -374,6 +380,8 @@ object DocxExporter {
         }
         return res
     }
+
+    val NUM_PR = Regex("<w:numPr><w:ilvl w:val=\"\\d+\"/><w:numId w:val=\"\\d+\"/></w:numPr>")
 
     private val TEXT_RE = Regex("<w:t(?: [^>]*)?>([^<]*)</w:t>")
 
