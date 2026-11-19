@@ -136,10 +136,11 @@ object DocxExporter {
             val free = pieces.isEmpty() && day.override == null
             if (free && weekend) freeWeekend.add(day.date.dayOfMonth)
             // Svátek ve všední den bez práce: zkratka „S“ podle vysvětlivek a slovně „st. svátek“.
-            val freeHoliday = free && !weekend && DayFlag.HOLIDAY in day.flags
+            // Státní svátek bez práce se vždy označí „st. svátek“ – i když připadne na víkend (ten je navíc proškrtnutý).
+            val freeHoliday = free && DayFlag.HOLIDAY in day.flags
             // Dovolená se píše slovem do sloupce hodin (do úzkých sloupců Příchod/Odchod se nevejde).
             val vacation = day.override == OverrideType.DOVOLENA
-            val code = if (vacation) null else day.override?.code ?: if (freeHoliday) "S" else null
+            val code = if (vacation) null else day.override?.code ?: if (freeHoliday && !weekend) "S" else null
             if (code != null) {
                 val target = when (pieces.size) {
                     0 -> C_AM_IN

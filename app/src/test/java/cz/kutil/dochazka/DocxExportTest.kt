@@ -192,6 +192,19 @@ class DocxExportTest {
         assertEquals("5:30", t[35].last())
     }
 
+    @Test fun svatekBezPraceVzdyStSvatek_iOVikendu() {
+        // 28. 9. 2024 je sobota a státní svátek, 2. 9. 2024 pondělí bez svátku
+        val (out, _) = DocxExporter.export(template(), WorkCalc.month(YearMonth.of(2024, 9), emptyList()), header)
+        val xml = doc(out)
+        val t = table(xml)
+        assertEquals(listOf("28", "", "", "", "", "", "", "", "", "", "", "st. svátek"), t[29]) // bez „S“ – přes sloupce vede čára
+        assertEquals("", t[30][11]) // neděle 29. 9. – jen proškrtnutá
+        assertTrue(xml.contains("<v:line ")) // víkend je proškrtnutý
+        // svátek ve všední den: S + st. svátek
+        val (out2, _) = DocxExporter.export(template(), WorkCalc.month(YearMonth.of(2026, 11), emptyList()), header)
+        assertEquals(listOf("17", "S", "", "", "", "", "", "", "", "", "", "st. svátek"), table(doc(out2))[18])
+    }
+
     @Test fun pulnocniVyjezdVExportu() {
         val shifts = listOf(ShiftData(1, DemoData.at(LocalDate.of(2026, 11, 12), 22, 0), DemoData.at(LocalDate.of(2026, 11, 13), 2, 0)))
         val (out, _) = DocxExporter.export(template(), WorkCalc.month(DemoData.MONTH, shifts), header)
