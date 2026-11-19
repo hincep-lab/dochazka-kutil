@@ -58,12 +58,13 @@ interface AppDao {
     @Query("SELECT * FROM pending_events WHERE id = :id")
     suspend fun pending(id: Long): PendingEventEntity?
 
-    /**
-     * Úklid historie: smaže zrušené události (falešné poplachy, už nepotřebné dotazy) starší než [cutoff].
-     * Potvrzené a odmítnuté zůstávají, aby šla dohledat případná chyba.
-     */
+    /** Úklid historie: smaže zrušené události (falešné poplachy, už nepotřebné dotazy) vyřízené před [cutoff]. */
     @Query("DELETE FROM pending_events WHERE status = 'SUPERSEDED' AND COALESCE(answeredAt, eventDetectedAt) < :cutoff")
     suspend fun deleteOldSuperseded(cutoff: Long): Int
+
+    /** Úklid historie: smaže všechny vyřízené události (potvrzené, odmítnuté, zrušené) před [cutoff]. Nevyřízené zůstávají vždy. */
+    @Query("DELETE FROM pending_events WHERE status != 'PENDING' AND COALESCE(answeredAt, eventDetectedAt) < :cutoff")
+    suspend fun deleteOldResolved(cutoff: Long): Int
 
     @Insert
     suspend fun insertPending(event: PendingEventEntity): Long

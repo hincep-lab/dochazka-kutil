@@ -177,11 +177,19 @@ object TrackingEngine {
     /** Jak dlouho zůstávají zrušené události v historii „K potvrzení“. */
     const val SUPERSEDED_KEEP_MS = 24L * 3600 * 1000
 
-    /** Smaže zrušené události starší než den (v obou databázích). */
+    /** Jak dlouho zůstávají potvrzené a odmítnuté události v historii. */
+    const val RESOLVED_KEEP_MS = 30L * 24 * 3600 * 1000
+
+    /**
+     * Úklid historie „K potvrzení“ (v obou databázích): zrušené po dni, potvrzené a odmítnuté po měsíci.
+     * Nevyřízené události se nemažou nikdy. Pracovní intervaly se úklidem nemění.
+     */
     suspend fun cleanupHistory(ctx: Context) = mutex.withLock {
         val app = ctx.applicationContext
-        val cutoff = System.currentTimeMillis() - SUPERSEDED_KEEP_MS
-        Graph.realDb(app).dao().deleteOldSuperseded(cutoff) + Graph.demoDb(app).dao().deleteOldSuperseded(cutoff)
+        val now = System.currentTimeMillis()
+        listOf(Graph.realDb(app), Graph.demoDb(app)).sumOf { db ->
+            db.dao().deleteOldSuperseded(now - SUPERSEDED_KEEP_MS) + db.dao().deleteOldResolved(now - RESOLVED_KEEP_MS)
+        }
     }
 
     /** Zapíše diagnostickou zprávu (např. chybu geofence) – zobrazuje se na hlavní obrazovce. */

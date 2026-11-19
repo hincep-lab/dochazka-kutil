@@ -93,9 +93,14 @@ fun PendingScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> U
     val verifying = state.pending.filter { it.status == "PENDING" && it.deferred }
     var onlyRejected by rememberSaveable { mutableStateOf(false) }
     // Zrušené události starší než den se nezobrazují (a úklid je i maže z databáze).
-    val cutoff = System.currentTimeMillis() - cz.kutil.dochazka.track.TrackingEngine.SUPERSEDED_KEEP_MS
+    val nowMs = System.currentTimeMillis()
     val history = state.pending.filter { it.status != "PENDING" }
-        .filter { it.status != "SUPERSEDED" || (it.answeredAt ?: it.eventDetectedAt) >= cutoff }
+        .filter {
+            val resolvedAt = it.answeredAt ?: it.eventDetectedAt
+            val keep = if (it.status == "SUPERSEDED") cz.kutil.dochazka.track.TrackingEngine.SUPERSEDED_KEEP_MS
+            else cz.kutil.dochazka.track.TrackingEngine.RESOLVED_KEEP_MS
+            resolvedAt >= nowMs - keep
+        }
         .filter { !onlyRejected || it.status == "NO" }.take(100)
 
     Column(
@@ -170,7 +175,7 @@ fun PendingScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> U
             FilterChip(selected = onlyRejected, onClick = { onlyRejected = !onlyRejected }, label = { Text("Jen odmítnuté") })
         }
         if (history.isEmpty()) Text("Zatím žádné vyřízené události.", style = MaterialTheme.typography.bodySmall)
-        Text("Zrušené události (falešné poplachy) se po jednom dni samy mažou. Potvrzené a odmítnuté zůstávají.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Historie se sama uklízí: zrušené události po jednom dni, potvrzené a odmítnuté po měsíci. Nevyřízené zůstávají, dokud je nevyřídíš. Docházky se úklid netýká.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         for (p in history) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

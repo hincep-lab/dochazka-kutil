@@ -247,7 +247,7 @@ class DatabaseTests {
         assertEquals(at(12, 15, 28), closed.rawEnd)
     }
 
-    @Test fun denStareZrusenePryc_potvrzeneAOdmitnuteZustanou() = runBlocking {
+    @Test fun uklidHistorie_zrusenePoDni_ostatniPoMesici_nevyrizeneNikdy() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(ctx, AppDatabase::class.java).build()
         val dao = db.dao()
         val now = System.currentTimeMillis()
@@ -258,9 +258,16 @@ class DatabaseTests {
         dao.insertPending(PendingEventEntity(type = "START", eventDetectedAt = now - 5 * day, promptCreatedAt = 0, answeredAt = now - 5 * day, status = "NO"))
         dao.insertPending(PendingEventEntity(type = "END", eventDetectedAt = now - 5 * day, promptCreatedAt = 0, answeredAt = now - 5 * day, status = "YES"))
         dao.insertPending(PendingEventEntity(type = "START", eventDetectedAt = now - 5 * day, promptCreatedAt = 0, status = "PENDING"))
+        dao.insertPending(PendingEventEntity(type = "START", eventDetectedAt = now - 40 * day, promptCreatedAt = 0, answeredAt = now - 40 * day, status = "NO"))
+        dao.insertPending(PendingEventEntity(type = "END", eventDetectedAt = now - 40 * day, promptCreatedAt = 0, answeredAt = now - 40 * day, status = "YES"))
+        dao.insertPending(PendingEventEntity(type = "START", eventDetectedAt = now - 90 * day, promptCreatedAt = 0, status = "PENDING"))
+        dao.insertShift(ShiftEntity(rawStart = now - 90 * day, rawEnd = now - 90 * day + 3600_000))
         assertEquals(2, dao.deleteOldSuperseded(now - TrackingEngine.SUPERSEDED_KEEP_MS))
+        assertEquals(2, dao.deleteOldResolved(now - TrackingEngine.RESOLVED_KEEP_MS))
         val left = dao.allPending().map { it.status }.sorted()
-        assertEquals(listOf("NO", "PENDING", "SUPERSEDED", "YES"), left) // dnešní zrušená zůstává
+        // dnešní zrušená a 5 dní staré potvrzené/odmítnuté zůstávají; nevyřízené zůstávají vždy (i 90 dní staré)
+        assertEquals(listOf("NO", "PENDING", "PENDING", "SUPERSEDED", "YES"), left)
+        assertEquals(1, dao.allShifts().size) // docházka se nemaže
         db.close()
     }
 
