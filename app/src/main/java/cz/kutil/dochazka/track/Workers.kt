@@ -125,6 +125,8 @@ class LongShiftWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
 
         suspend fun checkNow(ctx: Context) {
             val app = ctx.applicationContext
+            // Běží každou půlhodinu – zároveň uklidí den staré zrušené události.
+            TrackingEngine.cleanupHistory(app)
             val dao = Graph.realDb(app).dao()
             val open = dao.openShift()
             if (open == null) {

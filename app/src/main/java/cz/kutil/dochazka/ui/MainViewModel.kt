@@ -111,6 +111,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }.stateIn(viewModelScope, SharingStarted.Eagerly, UiState())
 
     private val demo: Boolean get() = state.value.demo
+
+    init {
+        // Při otevření aplikace uklidit den staré zrušené události z „K potvrzení“.
+        viewModelScope.launch { runCatching { TrackingEngine.cleanupHistory(ctx) } }
+    }
     private fun db() = Graph.db(ctx, demo)
     private fun dao() = db().dao()
 

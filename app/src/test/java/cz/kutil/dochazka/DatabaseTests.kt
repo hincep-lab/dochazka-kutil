@@ -247,6 +247,23 @@ class DatabaseTests {
         assertEquals(at(12, 15, 28), closed.rawEnd)
     }
 
+    @Test fun denStareZrusenePryc_potvrzeneAOdmitnuteZustanou() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(ctx, AppDatabase::class.java).build()
+        val dao = db.dao()
+        val now = System.currentTimeMillis()
+        val day = 24L * 3600 * 1000
+        dao.insertPending(PendingEventEntity(type = "START", eventDetectedAt = now - 2 * day, promptCreatedAt = 0, answeredAt = now - 2 * day, status = "SUPERSEDED"))
+        dao.insertPending(PendingEventEntity(type = "START", eventDetectedAt = now - 3 * day, promptCreatedAt = 0, answeredAt = null, status = "SUPERSEDED"))
+        dao.insertPending(PendingEventEntity(type = "START", eventDetectedAt = now - 3600_000, promptCreatedAt = 0, answeredAt = now - 3600_000, status = "SUPERSEDED"))
+        dao.insertPending(PendingEventEntity(type = "START", eventDetectedAt = now - 5 * day, promptCreatedAt = 0, answeredAt = now - 5 * day, status = "NO"))
+        dao.insertPending(PendingEventEntity(type = "END", eventDetectedAt = now - 5 * day, promptCreatedAt = 0, answeredAt = now - 5 * day, status = "YES"))
+        dao.insertPending(PendingEventEntity(type = "START", eventDetectedAt = now - 5 * day, promptCreatedAt = 0, status = "PENDING"))
+        assertEquals(2, dao.deleteOldSuperseded(now - TrackingEngine.SUPERSEDED_KEEP_MS))
+        val left = dao.allPending().map { it.status }.sorted()
+        assertEquals(listOf("NO", "PENDING", "SUPERSEDED", "YES"), left) // dnešní zrušená zůstává
+        db.close()
+    }
+
     @Test fun upravenyCasNavrhuSePouzijeAPuvodniZustane() = runBlocking {
         ctx.deleteDatabase("dochazka.db")
         Graph.realDb(ctx).dao().upsertSettings(SettingsEntity(trackingEnabled = true))
