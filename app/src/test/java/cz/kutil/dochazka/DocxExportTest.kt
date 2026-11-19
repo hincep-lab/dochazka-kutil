@@ -78,10 +78,10 @@ class DocxExportTest {
         assertTrue(xml.contains("from=\"-3.5pt,13.0pt\" to=\"393.5pt,0pt\""))
         // 12. 11. dva intervaly ve správných polích (Dopoledne + Odpoledne)
         assertEquals(listOf("12", "07:00", "15:30", "17:00", "19:00", "", "", "", "", "", "", "10:30"), t[13])
-        assertEquals(listOf("14", "09:00", "12:00", "", "", "", "", "", "", "", "", "3:00"), t[15])
-        assertEquals(listOf("15", "10:00", "12:30", "", "", "", "", "", "", "", "", "2:30"), t[16])
+        assertEquals(listOf("14", "09:00", "12:00", "", "", "", "", "", "", "", "", "3:00  (práce v sobotu)"), t[15])
+        assertEquals(listOf("15", "10:00", "12:30", "", "", "", "", "", "", "", "", "2:30  (práce v neděli)"), t[16])
         // svátek 17. 11. započten jednou
-        assertEquals(listOf("17", "07:00", "15:30", "", "", "", "", "", "", "", "", "8:30"), t[18])
+        assertEquals(listOf("17", "07:00", "15:30", "", "", "", "", "", "", "", "", "8:30  (práce ve svátek)"), t[18])
         assertEquals("30", t[31][0])
         assertEquals("8:30", t[31][11])
         // den 31 v listopadu neexistuje -> prázdný
@@ -91,7 +91,7 @@ class DocxExportTest {
         assertEquals("2:00", t[34].last())
         assertEquals("186:00", t[35].last())
         // součet denních hodin = celkem
-        val sum = (2..32).sumOf { r -> t[r][11].takeIf { it.matches(Regex("\\d+:\\d\\d")) }?.let { it.substringBefore(":").toLong() * 60 + it.substringAfter(":").toLong() } ?: 0L }
+        val sum = (2..32).sumOf { r -> t[r][11].substringBefore(" ").takeIf { it.matches(Regex("\\d+:\\d\\d")) }?.let { it.substringBefore(":").toLong() * 60 + it.substringAfter(":").toLong() } ?: 0L }
         assertEquals(186 * 60L, sum)
 
         val text = DocxExporter.text(xml)
@@ -120,13 +120,16 @@ class DocxExportTest {
             if (name != DocxExporter.DOCUMENT) assertArrayEquals("Soubor $name se změnil", bytes, b[name])
         }
         // jediná povolená změna mimo vložený text: odebrání prázdného číslování (neviditelný tabulátor u nadpisu)
-        val oXml = String(a[DocxExporter.DOCUMENT]!!, Charsets.UTF_8).replace(DocxExporter.NUM_PR, "")
+        val oXml = String(a[DocxExporter.DOCUMENT]!!, Charsets.UTF_8).replace(DocxExporter.NUM_PR, "").replace(DocxExporter.PG_MAR, "")
         val nXml = String(b[DocxExporter.DOCUMENT]!!, Charsets.UTF_8)
         for (tag in listOf("<w:tbl>", "<w:tr>", "<w:tc>", "<w:gridSpan", "<w:vMerge", "<w:tcBorders>", "<w:gridCol", "<w:p ", "<w:p>", "<w:sectPr")) {
             assertEquals("Počet $tag", count(oXml, tag), count(nXml, tag))
         }
         // Po odebrání vložených běhů musí být dokument totožný s originálem – kromě řádku Jméno/Měsíc/Rok.
-        val stripped = nXml.replace(Regex("<w:r w:rsidR=\"${DocxExporter.MARK}\">[\\s\\S]*?</w:r>"), "")
+        // okraje stránky: tabulka (10551 twipů) přesně na středu A4 (11906 twipů)
+        val margin = DocxExporter.PG_MAR.find(nXml)!!.value
+        assertTrue(margin, margin.contains("w:left=\"677\"") && margin.contains("w:right=\"677\""))
+        val stripped = nXml.replace(DocxExporter.PG_MAR, "").replace(Regex("<w:r w:rsidR=\"${DocxExporter.MARK}\">[\\s\\S]*?</w:r>"), "")
             .replace(">2:00</w:t>", ">---------</w:t>") // hodnota přesčasu nahrazuje původní pomlčky
         // porovnává se vše před odstavcem Jméno/Měsíc/Rok a vše za ním
         fun cut(x: String, needle: String) = x.indexOf(needle).let { x.substring(0, x.lastIndexOf("<w:p ", it)) to x.substring(x.indexOf("</w:p>", it)) }

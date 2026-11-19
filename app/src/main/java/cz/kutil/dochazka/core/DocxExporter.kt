@@ -156,6 +156,9 @@ object DocxExporter {
                     hours.append(run("  viz příloha", RPR_CELL_SMALL))
                 }
                 if (vacation) hours.append(run("  dovolená", RPR_CELL_SMALL))
+                // Práce o víkendu nebo ve svátek se označí přímo u dne, např. „3:00 (práce v sobotu)“.
+                val label = day.workLabels.joinToString(", ") { it.replaceFirstChar { c -> c.lowercase() } }
+                if (label.isNotEmpty()) hours.append(run("  ($label)", RPR_CELL_SMALL))
             } else if (vacation) {
                 hours.append(run("Dovolená", RPR_CELL))
             } else if (freeHoliday) {
@@ -207,6 +210,12 @@ object DocxExporter {
             if (pos < 0) throw DocxFormatException("Šablona nemá oddíl w:sectPr.")
             edits.add(Edit(pos, pos, appendix(month, header, overflow)))
         }
+
+        // --- vycentrování na stránku -----------------------------------------------------------
+        // Originál má levý okraj 2,5 cm a pravý 0, tabulka je ale širší než zbylé místo: přesahuje
+        // pravý kraj papíru a tiskárna uřízne sloupec hodin. Okraje se proto nastaví stejně po obou
+        // stranách tak, aby tabulka vyšla přesně na střed stránky. Tabulka sama se nemění.
+        edits.add(centerPage(xml))
 
         // --- prázdné číslování z originálu ----------------------------------------------------
         // Nadpis a několik popisků mají v originálu „číslování“ bez čísla. Některé prohlížeče za něj
@@ -365,6 +374,27 @@ object DocxExporter {
     // ---------------------------------------------------------------------------------------
     // Pomocné funkce
     // ---------------------------------------------------------------------------------------
+
+    /** Šířka tabulky formuláře podle w:tblW (v twipech). */
+    private fun tableWidth(xml: String): Double =
+        Regex("<w:tblW w:w=\"([0-9.]+)\"").find(xml)?.groupValues?.get(1)?.toDouble()
+            ?: throw DocxFormatException("Tabulka formuláře nemá šířku.")
+
+    private fun centerPage(xml: String): Edit {
+        val m = PG_MAR.find(xml) ?: throw DocxFormatException("Formulář nemá okraje stránky.")
+        val pageW = Regex("<w:pgSz [^>]*w:w=\"(\\d+)\"").find(xml)?.groupValues?.get(1)?.toInt()
+            ?: throw DocxFormatException("Formulář nemá velikost stránky.")
+        val side = ((pageW - tableWidth(xml)) / 2).toInt().coerceAtLeast(MIN_MARGIN)
+        val tag = m.value
+            .replace(Regex("w:left=\"\\d+\""), "w:left=\"$side\"")
+            .replace(Regex("w:right=\"\\d+\""), "w:right=\"$side\"")
+        return Edit(m.range.first, m.range.last + 1, tag)
+    }
+
+    val PG_MAR = Regex("<w:pgMar [^>]*/>")
+
+    /** Nejmenší boční okraj (5 mm) – menší většina tiskáren nevytiskne. */
+    private const val MIN_MARGIN = 283
 
     /** Plovoucí čára ukotvená v první buňce Příchod; neposouvá text ani výšku řádku. */
     private fun strikeLine(rowCount: Int): String {
