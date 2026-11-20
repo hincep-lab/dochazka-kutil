@@ -149,25 +149,36 @@ object DocxExporter {
                 }
                 edits.add(cellText(xml, row.cells[target], code, RPR_CELL))
             }
-            val hours = StringBuilder()
+            // Sloupec hodin: popisek vlevo, hodiny vpravo na pevném tabulátoru – čísla jdou
+            // pod sebou bez ohledu na to, jestli je u dne poznámka.
+            val notes = ArrayList<String>()
             if (pieces.isNotEmpty()) {
-                hours.append(run(WorkCalc.formatHm(day.minutes), RPR_CELL))
                 if (pieces.size > SLOTS_PER_DAY) {
                     overflow.add(day.date.dayOfMonth)
-                    hours.append(run("  viz příloha", RPR_CELL_SMALL))
+                    notes.add("viz příloha")
                 }
-                if (vacation) hours.append(run("  dovolená", RPR_CELL_SMALL))
-                // Práce o víkendu nebo ve svátek se označí přímo u dne, např. „3:00 (práce v sobotu)“.
+                if (vacation) notes.add("dovolená")
+                // Práce o víkendu nebo ve svátek, např. „(práce v sobotu)      3:00“.
                 val label = day.workLabels.joinToString(", ") { it.replaceFirstChar { c -> c.lowercase() } }
-                if (label.isNotEmpty()) hours.append(run("  ($label)", RPR_CELL_SMALL))
+                if (label.isNotEmpty()) notes.add("($label)")
+            }
+            val hours = StringBuilder()
+            if (notes.isNotEmpty()) hours.append(run(notes.joinToString(" "), RPR_CELL_SMALL))
+            if (pieces.isNotEmpty()) {
+                hours.append(TAB_RUN).append(run(WorkCalc.formatHm(day.minutes), RPR_CELL))
             } else if (vacation) {
-                hours.append(run("Dovolená", RPR_CELL))
+                hours.append(run("Dovolená", RPR_CELL_SMALL))
             } else if (freeHoliday) {
-                hours.append(run("st. svátek", RPR_CELL))
+                hours.append(run("st. svátek", RPR_CELL_SMALL))
             }
             if (hours.isNotEmpty()) {
-                val pos = insertionPoint(xml, row.cells[C_HOURS])
+                val cell = row.cells[C_HOURS]
+                val pos = insertionPoint(xml, cell)
                 edits.add(Edit(pos, pos, hours.toString()))
+                // Zarovnání odstavce v buňce: místo „doprava“ vlevo s pravým tabulátorem u okraje buňky.
+                val jc = xml.indexOf(HOURS_JC_ORIG, cell.start)
+                if (jc < 0 || jc > cell.end) throw DocxFormatException("Buňka hodin nemá očekávané zarovnání.")
+                edits.add(Edit(jc, jc + HOURS_JC_ORIG.length, HOURS_JC_TAB))
             }
         }
 
@@ -375,6 +386,11 @@ object DocxExporter {
     // ---------------------------------------------------------------------------------------
     // Pomocné funkce
     // ---------------------------------------------------------------------------------------
+
+    /** Původní zarovnání buňky hodin a jeho náhrada (pravý tabulátor = pravý okraj textu buňky: 1931 − 2 × 70 twipů). */
+    const val HOURS_JC_ORIG = "<w:jc w:val=\"right\"/>"
+    const val HOURS_JC_TAB = "<w:tabs><w:tab w:val=\"right\" w:pos=\"1790\"/></w:tabs><w:jc w:val=\"left\"/>"
+    private const val TAB_RUN = "<w:r w:rsidR=\"$MARK\"><w:tab/></w:r>"
 
     /** Šířka tabulky formuláře podle w:tblW (v twipech). */
     private fun tableWidth(xml: String): Double =
