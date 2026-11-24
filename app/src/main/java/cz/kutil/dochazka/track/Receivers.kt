@@ -6,6 +6,8 @@ import android.content.Intent
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofenceStatusCodes
 import com.google.android.gms.location.GeofencingEvent
+import cz.kutil.dochazka.core.PRAGUE
+import cz.kutil.dochazka.core.Rounding
 import cz.kutil.dochazka.core.TrackEvent
 import cz.kutil.dochazka.data.AppPrefs
 import cz.kutil.dochazka.data.EventSource
@@ -16,6 +18,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.time.Instant
 import kotlin.math.roundToInt
+
+private fun hm(ms: Long): String = Instant.ofEpochMilli(ms).atZone(PRAGUE).let { "%d:%02d".format(it.hour, it.minute) }
+private fun hmRounded(ms: Long): String = hm(Rounding.roundToHalfHour(Instant.ofEpochMilli(ms)).toEpochMilli())
 
 private val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -96,13 +101,30 @@ class AnswerReceiver : BroadcastReceiver() {
         val id = intent.getLongExtra(Notifier.EXTRA_PENDING_ID, -1L)
         if (id == Notifier.TEST_PENDING_ID) {
             Notifier.cancelTest(app)
+            val yes = intent.getBooleanExtra(Notifier.EXTRA_YES, false)
+            Notifier.showDone(app, "Zkouška v pořádku", "Klepnutí na ${if (yes) "ANO" else "NE"} funguje. Nic se nezapsalo.")
             return
         }
         if (id < 0 || !intent.hasExtra(Notifier.EXTRA_YES)) return
         val yes = intent.getBooleanExtra(Notifier.EXTRA_YES, false)
         async {
+            val dao = Graph.realDb(app).dao()
+            val before = dao.pending(id)
             TrackingEngine.handle(app, TrackEvent.Answer(id, yes, Instant.now()))
             Notifier.cancel(app, id)
+            // Krátké potvrzení, co se zapsalo – bez nutnosti otevírat aplikaci.
+            val after = dao.pending(id)
+            val (title, text) = when {
+                before == null || before.status != "PENDING" -> "Už vyřízeno" to "Tento dotaz byl vyřízen dříve, nic se nezměnilo."
+                after?.status == "SUPERSEDED" -> "Nic se nezměnilo" to "Dotaz už nebyl potřeba (směna mezitím začala nebo skončila jinak)."
+                !yes && before.type == "END" -> "Směna běží dál" to "Práce zůstává zapnutá."
+                !yes -> "Bez záznamu" to "Nic se nezapsalo."
+                before.type == "END" -> "Konec práce zapsán" to "Konec ${hm(before.effectiveAt)}, do výkazu ${hmRounded(before.effectiveAt)}."
+                before.pairedEndAt != null -> "Práce zapsána" to
+                    "${hm(before.effectiveAt)}–${hm(before.pairedEndAt)}, do výkazu ${hmRounded(before.effectiveAt)}–${hmRounded(before.pairedEndAt)}."
+                else -> "Začátek práce zapsán" to "Od ${hm(before.effectiveAt)}, do výkazu ${hmRounded(before.effectiveAt)}."
+            }
+            Notifier.showDone(app, title, text)
         }
     }
 }
@@ -110,8 +132,25 @@ class AnswerReceiver : BroadcastReceiver() {
 /** „Stále pracuji“ z upozornění na dlouhou směnu. Směnu nikdy neukončuje. */
 class ShiftActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Notifier.ACTION_STILL_WORKING) return
         val app = context.applicationContext
+        if (intent.action == Notifier.ACTION_END_AT) {
+            // Ukončení směny přímo z upozornění na dlouhou směnu.
+            val shiftId = intent.getLongExtra(Notifier.EXTRA_SHIFT_ID, -1L)
+            val requested = intent.getLongExtra(Notifier.EXTRA_END_AT, -1L)
+            async {
+                val open = Graph.realDb(app).dao().openShift()
+                Notifier.cancelLongShift(app)
+                if (open == null || open.id != shiftId) {
+                    Notifier.showDone(app, "Už vyřízeno", "Tato směna už je ukončená.")
+                    return@async
+                }
+                val at = if (requested > 0) requested else System.currentTimeMillis()
+                TrackingEngine.handle(app, TrackEvent.ManualEnd(Instant.ofEpochMilli(at)))
+                Notifier.showDone(app, "Konec práce zapsán", "Konec ${hm(at)}, do výkazu ${hmRounded(at)}. Čas můžeš opravit v aplikaci.")
+            }
+            return
+        }
+        if (intent.action != Notifier.ACTION_STILL_WORKING) return
         val shiftId = intent.getLongExtra(Notifier.EXTRA_SHIFT_ID, -1L)
         if (shiftId >= 0) AppPrefs.setLongShiftAck(app, shiftId, System.currentTimeMillis())
         Notifier.cancelLongShift(app)

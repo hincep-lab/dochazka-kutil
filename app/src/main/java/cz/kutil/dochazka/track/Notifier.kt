@@ -27,6 +27,39 @@ object Notifier {
     const val EXTRA_PENDING_ID = "pending_id"
     const val EXTRA_YES = "yes"
     const val EXTRA_OPEN_TAB = "open_tab"
+    const val CHANNEL_DONE = "answer_done"
+    private const val DONE_ID = 504
+    const val ACTION_END_AT = "cz.kutil.dochazka.END_AT"
+    const val EXTRA_END_AT = "end_at"
+
+    /**
+     * Akce, která se vyřídí přímo v oznámení (i na zamčené obrazovce a na hodinkách):
+     * systém ví, že neotevírá žádnou obrazovku, takže aplikace se nespustí do popředí.
+     */
+    private fun quickAction(label: String, pi: PendingIntent): NotificationCompat.Action =
+        NotificationCompat.Action.Builder(0, label, pi).setShowsUserInterface(false).build()
+
+    /** Krátké potvrzení, co se po klepnutí v oznámení zapsalo. Samo zmizí po pár vteřinách, bez zvuku. */
+    fun showDone(ctx: Context, title: String, text: String) {
+        if (!canNotify(ctx)) return
+        ensureChannel(ctx)
+        val open = PendingIntent.getActivity(
+            ctx, DONE_ID,
+            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val builder = NotificationCompat.Builder(ctx, CHANNEL_DONE)
+            .setSmallIcon(R.drawable.ic_notif)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setSilent(true)
+            .setAutoCancel(true)
+            .setTimeoutAfter(15_000)
+            .setContentIntent(open)
+        notifySafe(ctx, DONE_ID, builder)
+    }
 
     private val TIME = DateTimeFormatter.ofPattern("H:mm")
     private val DAY = DateTimeFormatter.ofPattern("d. M.")
@@ -40,6 +73,9 @@ object Notifier {
         val monthly = NotificationChannel(CHANNEL_MONTHLY, "Měsíční uzávěrka", NotificationManager.IMPORTANCE_DEFAULT)
         monthly.description = "Připomenutí prvního dne v měsíci: zkontrolovat a odeslat docházku za minulý měsíc."
         nm.createNotificationChannel(monthly)
+        val done = NotificationChannel(CHANNEL_DONE, "Potvrzení zápisu", NotificationManager.IMPORTANCE_LOW)
+        done.description = "Krátká potvrzení po odpovědi ANO / NE přímo v oznámení."
+        nm.createNotificationChannel(done)
     }
 
     /** Připomenutí měsíční uzávěrky. Vrací false, pokud oznámení nejde zobrazit. */
@@ -127,7 +163,7 @@ object Notifier {
                 ctx, notificationId(p.id) * 2 + (if (yes) 1 else 0), intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            builder.addAction(0, if (yes) "ANO" else "NE", pi)
+            builder.addAction(quickAction(if (yes) "ANO" else "NE", pi))
         }
         try {
             NotificationManagerCompat.from(ctx).notify(notificationId(p.id), builder.build())
@@ -152,6 +188,13 @@ object Notifier {
     fun showLongShift(ctx: Context, shiftId: Long, startMs: Long, hours: Long, returnAtMs: Long?): Boolean {
         if (!canNotify(ctx)) return false
         ensureChannel(ctx)
+        // Ukončení přímo z oznámení: časem zaznamenaného návratu, nebo teď (čas „teď“ se vezme až při klepnutí).
+        fun endAt(code: Int, at: Long?) = PendingIntent.getBroadcast(
+            ctx, LONG_SHIFT_ID * 10 + code,
+            Intent(ctx, ShiftActionReceiver::class.java).setAction(ACTION_END_AT)
+                .putExtra(EXTRA_SHIFT_ID, shiftId).putExtra(EXTRA_END_AT, at ?: -1L),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
         val end = PendingIntent.getActivity(
             ctx, LONG_SHIFT_ID,
             Intent(ctx, MainActivity::class.java).putExtra(EXTRA_OPEN_TAB, "endshift")
@@ -176,8 +219,9 @@ object Notifier {
             .setOnlyAlertOnce(true)
             .setAutoCancel(true)
             .setContentIntent(end)
-            .addAction(0, "Ukončit práci", end)
-            .addAction(0, "Stále pracuji", still)
+        if (returnAtMs != null) builder.addAction(quickAction("Konec v ${time(returnAtMs)}", endAt(1, returnAtMs)))
+        builder.addAction(quickAction("Konec teď", endAt(2, null)))
+        builder.addAction(quickAction("Stále pracuji", still))
         return notifySafe(ctx, LONG_SHIFT_ID, builder)
     }
 
@@ -219,7 +263,7 @@ object Notifier {
             val intent = Intent(ctx, AnswerReceiver::class.java).setAction("cz.kutil.dochazka.ANSWER")
                 .putExtra(EXTRA_PENDING_ID, TEST_PENDING_ID).putExtra(EXTRA_YES, yes)
             val pi = PendingIntent.getBroadcast(ctx, TEST_ID * 2 + (if (yes) 1 else 0), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            builder.addAction(0, if (yes) "ANO" else "NE", pi)
+            builder.addAction(quickAction(if (yes) "ANO" else "NE", pi))
         }
         return notifySafe(ctx, TEST_ID, builder)
     }

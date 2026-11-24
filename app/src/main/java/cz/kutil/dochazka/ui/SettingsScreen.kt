@@ -119,7 +119,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
                 steps = 19,
             )
             Text(
-                "Ochrana proti zapomenutému ukončení práce. Přijde oznámení s volbami „Ukončit práci“ a „Stále pracuji“. " +
+                "Ochrana proti zapomenutému ukončení práce. Přijde oznámení s volbami „Konec v … (čas návratu)“, „Konec teď“ a „Stále pracuji“ – vyřídíš je přímo v oznámení. " +
                     "Směna se nikdy neukončí sama; při ukončení aplikace nabídne čas návratu domů, pokud ho zaznamenala.",
                 style = MaterialTheme.typography.bodySmall,
             )
