@@ -291,8 +291,8 @@ private fun DrawScope.drawLadder(cx: Float, floorY: Float, u: Float) {
 }
 
 internal fun DrawScope.drawCarriedLadder(facing: Float, u: Float) {
-    rotate(-70f * facing, Offset(10 * u * facing, -52 * u)) {
-        val c = Offset(10 * u * facing, -52 * u)
+    rotate(-12f * facing, Offset(-4 * u * facing, -60 * u)) {
+        val c = Offset(-4 * u * facing, -60 * u)
         drawLine(Color(0xFF241A14), Offset(c.x - 34 * u, c.y - 5 * u), Offset(c.x + 34 * u, c.y - 5 * u), strokeWidth = 5 * u, cap = StrokeCap.Round)
         drawLine(Color(0xFFB9C4CF), Offset(c.x - 34 * u, c.y - 5 * u), Offset(c.x + 34 * u, c.y - 5 * u), strokeWidth = 3 * u, cap = StrokeCap.Round)
         drawLine(Color(0xFF241A14), Offset(c.x - 34 * u, c.y + 5 * u), Offset(c.x + 34 * u, c.y + 5 * u), strokeWidth = 5 * u, cap = StrokeCap.Round)

@@ -695,6 +695,8 @@ internal fun DrawScope.drawPlumber(p: Pose, floorY: Float, u: Float) {
     val shK = (1f - (p.lift / (90 * u)).coerceIn(0f, 0.7f))
     drawOval(Brush.radialGradient(listOf(Color(0x66000000), Color.Transparent), center = Offset(p.x, floorY), radius = 26 * u * shK), Offset(p.x - 26 * u * shK, floorY - 4 * u), Size(52 * u * shK, 8 * u))
     translate(p.x, floorY - bob + p.sit * 12 * u - p.lift) {
+        // štafle nesené přes rameno – za tělem
+        if (p.carry == 1) drawCarriedLadder(p.facing, u)
         scale(p.facing, 1f, pivot = Offset.Zero) {
             rotate(p.tilt + 7f * p.run, pivot = Offset(0f, -12 * u)) {
                 // ---------- nohy (stehno + lýtko, koleno se při běhu ohýbá)
@@ -791,7 +793,6 @@ internal fun DrawScope.drawPlumber(p: Pose, floorY: Float, u: Float) {
         if (p.capLift > 0.5f) {
             rotate(p.capSpin, pivot = Offset(4 * u, -92 * u - p.capLift)) { drawPlumberCap(Offset(4 * u, -90 * u - p.capLift), u) }
         }
-        if (p.carry == 1) drawCarriedLadder(p.facing, u)
         if (p.carry == 2) drawDuck(Offset(16 * u * p.facing, -46 * u), 0.9f * u, p.facing)
         if (p.zzz) {
             for (i in 0 until 3) {
