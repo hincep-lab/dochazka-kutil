@@ -126,6 +126,8 @@ fun HomeScreen(
     val animate = decorAnimationsEnabled(resumeTick)
     val clock = rememberWaterClock(animate)
     val water = rememberWaterState(open != null, animate)
+    val dripSync = remember { DripSync() }
+    val soundsOn = animate && remember(resumeTick) { soundsEnabled(context) }
     val reportStart = open?.let { it.editedStart ?: Rounding.roundToHalfHour(Instant.ofEpochMilli(it.rawStart)).toEpochMilli() }
     val worked = reportStart?.let { now - it } ?: 0L
     val runStart = reportStart
@@ -143,7 +145,7 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // --- záhlaví s logem (vpravo je místo pro kohoutek) ---------------------------------------
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 18.dp, start = 8.dp).height(62.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 14.dp, start = 8.dp).height(64.dp)) {
             Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
                 Icon(painterResource(R.drawable.ic_handyman), null, tint = Color.White, modifier = Modifier.size(34.dp))
                 Icon(painterResource(R.drawable.ic_water_drop), null, tint = Color(0xFF5CC2FF), modifier = Modifier.size(18.dp).align(Alignment.BottomEnd))
@@ -159,7 +161,7 @@ fun HomeScreen(
                 )
                 Text("Instalatérská docházka · ${state.settings.organization}", fontSize = 12.sp, color = Ind.onBgDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Spacer(Modifier.size(120.dp)) // kohoutek
+            Spacer(Modifier.size(150.dp)) // kohoutek
         }
         if (state.demo) {
             Text("Demo režim – ukázková data. Vypneš ho v Nastavení.", color = Ind.amber, fontSize = 13.sp)
@@ -170,7 +172,8 @@ fun HomeScreen(
             open != null && reportStart != null -> {
                 val startDay = Fmt.zoned(open.rawStart).toLocalDate()
                 val over = worked > 8 * 3_600_000L
-                WaterPanel(GlassTone.WORKING, clock, water, worked / (8f * 3_600_000f), animate) {
+                WaterSoundEffects(soundsOn, clock, dripSync, dripping = water.flow > 0.85f, overflowing = over)
+                WaterPanel(GlassTone.WORKING, clock, water, worked / (8f * 3_600_000f), animate, drip = dripSync) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(R.drawable.ic_engineering), null, tint = Color.White, modifier = Modifier.size(if (big) 26.dp else 32.dp))
                         Spacer(Modifier.size(10.dp))

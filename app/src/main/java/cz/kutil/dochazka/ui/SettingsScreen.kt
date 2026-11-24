@@ -124,9 +124,21 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
                 })
             }
             Text(
-                "Kapající kohoutek, vlnění hladiny, proudění v potrubí a vír u vpusti. Běží jen když je aplikace na obrazovce, " +
+                "Kapající kohoutek, nádoba plnící se k 8 hodinám, proudění v potrubí a vír u vpusti. Běží jen když je aplikace na obrazovce, " +
                     "nejvýš 30 snímků za sekundu. Při vypnutí (nebo když má telefon zapnuté „Odebrat animace“) zůstane klidný statický vzhled. " +
                     "Na docházku nemají animace žádný vliv.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            var sounds by remember { mutableStateOf(AppPrefs.waterSounds(context)) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Zvuky vody", Modifier.weight(1f))
+                Switch(checked = sounds, onCheckedChange = {
+                    sounds = it
+                    AppPrefs.setWaterSounds(context, it)
+                })
+            }
+            Text(
+                "Tiché ťuknutí kapky a v přesčasu šumění přetékající vody. Hraje jen při otevřené aplikaci a nikdy v tichém režimu ani na vibracích.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
