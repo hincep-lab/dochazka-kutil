@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.sp
 import cz.kutil.dochazka.R
+import cz.kutil.dochazka.BuildConfig
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Column
@@ -111,6 +112,7 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
     }
     LaunchedEffect(requestedTab.value) {
         val requested = requestedTab.value
+        if (BuildConfig.DEBUG) println("POZADAVEK zpracovani: $requested")
         if (requested == "pending") {
             tab = Tab.PENDING
             detailDate = null
@@ -133,7 +135,9 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
             diag = false
             requestedTab.value = null
         } else if (requested != null && requested.startsWith("month")) {
+            if (BuildConfig.DEBUG) println("POZADAVEK mesic vetev")
             runCatching { YearMonth.parse(requested.substringAfter("month:", "")) }.getOrNull()?.let { vm.selectedMonth.value = it }
+            if (BuildConfig.DEBUG) println("POZADAVEK mesic nastaven")
             tab = Tab.MONTH
             detailDate = null
             requestedTab.value = null
