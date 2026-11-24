@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -240,7 +241,7 @@ private fun DrawScope.drawWater(
     }
     drawPath(front, Brush.verticalGradient(listOf(base.copy(alpha = glow + 0.10f), Color(0x880C3B78)), startY = surface - amp, endY = h))
     // světelné kaustiky ve vodě – dvě vrstvy posouvané proti sobě, jen pod hladinou
-    androidx.compose.ui.graphics.drawscope.clipPath(front) {
+    clipPath(front) {
         val tile = 150.dp.toPx()
         for ((layer, dir) in listOf(0 to 1f, 1 to -1f)) {
             val ox = ((phase * 9f * dir * density) % tile + tile) % tile - tile
