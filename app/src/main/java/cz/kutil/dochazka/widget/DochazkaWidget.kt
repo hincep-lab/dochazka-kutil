@@ -70,7 +70,6 @@ class DochazkaWidget : AppWidgetProvider() {
             applyWater(app, views, s, nowMs)
             if (s.working && start != null) {
                 views.setTextViewText(R.id.w_status, "PRÁVĚ PRACUJEŠ")
-                views.setInt(R.id.w_status_bar, "setBackgroundResource", R.drawable.widget_status_working)
                 views.setTextViewText(R.id.w_start, "Začátek ${s.sinceText}")
                 // Živý časovač počítá sám launcher – aplikace kvůli němu nemusí běžet ani widget obnovovat.
                 val base = SystemClock.elapsedRealtime() - (System.currentTimeMillis() - start)
@@ -81,7 +80,6 @@ class DochazkaWidget : AppWidgetProvider() {
                 views.setInt(R.id.w_button, "setBackgroundResource", R.drawable.widget_button_stop)
             } else {
                 views.setTextViewText(R.id.w_status, if (s.pending > 0) "ČEKÁ NA POTVRZENÍ" else "DOMA")
-                views.setInt(R.id.w_status_bar, "setBackgroundResource", if (s.pending > 0) R.drawable.widget_status_pending else R.drawable.widget_status_idle)
                 views.setTextViewText(R.id.w_start, "Dnes odpracováno")
                 views.setChronometer(R.id.w_timer, SystemClock.elapsedRealtime(), null, false)
                 views.setViewVisibility(R.id.w_timer, View.GONE)
