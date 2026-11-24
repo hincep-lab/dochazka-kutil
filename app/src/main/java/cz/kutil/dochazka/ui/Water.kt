@@ -94,8 +94,14 @@ fun decorAnimationsEnabled(settingsTick: Any? = null): Boolean {
 object WaterClockBoost { @Volatile var until: Float = -1f }
 
 /** Společný čas animací v sekundách (max. [fps] snímků/s, jen když je aplikace vidět). */
+/** Jen pro natáčení ukázkového videa v testech: čas animací řídí test. */
+object WaterClockDebug {
+    @Volatile var manual: androidx.compose.runtime.MutableFloatState? = null
+}
+
 @Composable
 fun rememberWaterClock(enabled: Boolean, fps: Int = 30): State<Float> {
+    WaterClockDebug.manual?.let { return it }
     val t = remember { mutableFloatStateOf(0f) }
     val owner = LocalLifecycleOwner.current
     LaunchedEffect(enabled, owner) {

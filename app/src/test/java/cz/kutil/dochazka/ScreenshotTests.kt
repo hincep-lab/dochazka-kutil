@@ -242,6 +242,8 @@ class ScreenshotTests {
         cz.kutil.dochazka.ui.PlumberDebug.forcedOrder = listOf(cz.kutil.dochazka.ui.Act.PIPE, cz.kutil.dochazka.ui.Act.TUB)
         val fps = 24
         var frame = 0
+        val manualClock = androidx.compose.runtime.mutableFloatStateOf(0f)
+        cz.kutil.dochazka.ui.WaterClockDebug.manual = manualClock
         cz.kutil.dochazka.ui.SoundTap.listener = { name -> println("SOUND_EVENT $frame $name") }
         val state = craftedState(open = true, pending = false, hoursAgo = 8.1)
         val vm = MainViewModel(ApplicationProvider.getApplicationContext())
@@ -262,6 +264,8 @@ class ScreenshotTests {
         val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         while (frame < total) {
+            manualClock.floatValue = frame / fps.toFloat()
+            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1000L / fps))
             bmp.eraseColor(android.graphics.Color.BLACK)
             view.draw(canvas)
@@ -272,6 +276,7 @@ class ScreenshotTests {
         }
         cz.kutil.dochazka.ui.SoundTap.listener = null
         cz.kutil.dochazka.ui.PlumberDebug.forcedOrder = null
+        cz.kutil.dochazka.ui.WaterClockDebug.manual = null
     }
 
     /** Celá aplikace s lištami nad ukázkovými daty (demo režim). */
