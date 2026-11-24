@@ -382,6 +382,9 @@ fun HomeScreen(
         PlumberStage(
             clock, water, animate, onSound = { sounds?.gag(it) },
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(StageHeight),
+            // pracuje jen během směny; po práci televize a pivo, od 20:00 do 6:00 spí
+            working = open != null,
+            night = Fmt.zoned(now).hour.let { it >= 20 || it < 6 },
         )
     }
     }

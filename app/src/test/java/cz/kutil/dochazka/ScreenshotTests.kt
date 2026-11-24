@@ -204,6 +204,27 @@ class ScreenshotTests {
 
     @Test
     @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageLounge() {
+        shoot("19_televize_a_spanek") {
+            Box(Modifier.fillMaxSize()) {
+                WetBackground()
+                androidx.compose.foundation.layout.Column {
+                    val clock = androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(37.3f) }
+                    for ((act, e) in listOf(cz.kutil.dochazka.ui.Act.TV to 2f, cz.kutil.dochazka.ui.Act.TV to 4.2f, cz.kutil.dochazka.ui.Act.TV to 9.5f,
+                        cz.kutil.dochazka.ui.Act.TV to 18.5f, cz.kutil.dochazka.ui.Act.SLEEP to 3f, cz.kutil.dochazka.ui.Act.SLEEP to 10f)) {
+                        cz.kutil.dochazka.ui.PlumberStage(
+                            clock, cz.kutil.dochazka.ui.WaterState(0f, 0f), animate = true, onSound = {},
+                            modifier = Modifier.fillMaxWidth().height(cz.kutil.dochazka.ui.StageHeight),
+                            fixedAct = act, fixedElapsed = e,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
     fun stageWander() = stage("18_prochazka", cz.kutil.dochazka.ui.Act.WANDER, listOf(2f, 5f, 8f))
 
     /**
@@ -214,6 +235,10 @@ class ScreenshotTests {
     @Config(qualifiers = "w412dp-h915dp-xxhdpi")
     fun demoVideo() {
         org.junit.Assume.assumeTrue(System.getenv("MAKE_VIDEO") == "1")
+        android.provider.Settings.Global.putFloat(
+            ApplicationProvider.getApplicationContext<android.app.Application>().contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
+        )
         cz.kutil.dochazka.ui.PlumberDebug.forcedOrder = listOf(cz.kutil.dochazka.ui.Act.PIPE, cz.kutil.dochazka.ui.Act.TUB)
         val fps = 24
         var frame = 0

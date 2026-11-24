@@ -35,6 +35,10 @@ import kotlin.math.sin
 
 enum class Act(val length: Float) {
     PIPE(17.5f), TOILET(17.5f), LADDER(18.5f), SINK(17.5f), TUB(19f), WANDER(10f),
+    /** Mimo pracovní dobu: křeslo, televize a pivo (smyčka). */
+    TV(24f),
+    /** Od 20:00 do 6:00: spí v křesle (smyčka). */
+    SLEEP(16f),
 }
 
 private val SCENES = listOf(Act.PIPE, Act.TOILET, Act.LADDER, Act.SINK, Act.TUB)
@@ -63,6 +67,8 @@ private fun eventsOf(a: Act): List<Pair<Float, GagSound>> = when (a) {
         14.4f to GagSound.SQUEAK,
     )
     Act.WANDER -> emptyList()
+    Act.TV -> listOf(9.2f to GagSound.BURP, 18.0f to GagSound.CHEER)
+    Act.SLEEP -> listOf(2.0f to GagSound.SNORE, 9.5f to GagSound.SNORE)
 }
 
 /** Jen pro natáčení ukázkového videa v testech: pevné pořadí scének bez procházek. */
@@ -80,6 +86,10 @@ fun PlumberStage(
     animate: Boolean,
     onSound: (GagSound) -> Unit,
     modifier: Modifier = Modifier,
+    /** Kutil pracuje jen během směny. */
+    working: Boolean = true,
+    /** 20:00–6:00 = spí. */
+    night: Boolean = false,
     fixedAct: Act? = null,
     fixedElapsed: Float? = null,
 ) {
@@ -88,8 +98,14 @@ fun PlumberStage(
     val variant = remember { mutableIntStateOf(0) }
     val smoother = remember { PoseSmoother() }
     // režisér: scénky se střídají samy, mezi nimi se Kutil občas jen projde
-    LaunchedEffect(animate, fixedAct) {
+    LaunchedEffect(animate, fixedAct, working, night) {
         if (!animate || fixedAct != null) return@LaunchedEffect
+        if (!working && PlumberDebug.forcedOrder == null) {
+            // po práci: televize a pivo, v noci spánek – běží ve smyčce
+            act.intValue = (if (night) Act.SLEEP else Act.TV).ordinal
+            start.floatValue = clock.value
+            return@LaunchedEffect
+        }
         val forced = PlumberDebug.forcedOrder?.toMutableList()
         val order = forced ?: SCENES.shuffled().toMutableList()
         var nextAt = clock.value + 2.5f
@@ -115,7 +131,10 @@ fun PlumberStage(
         if (!animate || fixedAct != null) return@LaunchedEffect
         val events = eventsOf(Act.entries[act.intValue])
         var prev = -1f
-        snapshotFlow { clock.value - start.floatValue }.collect { e ->
+        val a = Act.entries[act.intValue]
+        val loop = a == Act.TV || a == Act.SLEEP
+        snapshotFlow { (clock.value - start.floatValue).let { if (loop && it >= 0f) it % a.length else it } }.collect { e ->
+            if (loop && e < prev) prev = -0.01f
             if (prev >= 0f || e < 0.2f) for ((at, s) in events) if (prev < at && e >= at) onSound(s)
             prev = e
         }
@@ -124,18 +143,23 @@ fun PlumberStage(
     Canvas(modifier) {
         val t = clock.value
         val a = fixedAct ?: Act.entries[act.intValue]
-        val e = fixedElapsed ?: if (animate) t - start.floatValue else -1f
+        var e = fixedElapsed ?: if (animate) t - start.floatValue else -1f
+        val looping = a == Act.TV || a == Act.SLEEP
+        if (looping && e >= 0f) e %= a.length
+        if (!animate && looping) e = 1f
         if (e < 0f || e > a.length) return@Canvas
         val u = 1.dp.toPx()
         val floorY = size.height - 10 * u
         // rekvizity se jemně objeví a zmizí
-        val fade = min(1f, min(e / 0.6f, (a.length - e) / 0.6f)).coerceIn(0f, 1f)
+        val fade = if (looping) 1f else min(1f, min(e / 0.6f, (a.length - e) / 0.6f)).coerceIn(0f, 1f)
         when (a) {
             Act.PIPE -> actPipe(e, t, floorY, u, fade, pipes, smoother)
             Act.TOILET -> drawToiletScene2(e, t, floorY, u, smoother)
             Act.LADDER -> actLadder(e, t, floorY, u, fade, pipes, smoother)
             Act.SINK -> actSink(e, t, floorY, u, fade, smoother)
             Act.TUB -> actTub(e, t, floorY, u, fade, smoother)
+            Act.TV -> actLounge(e, t, floorY, u, sleep = false, sm = smoother)
+            Act.SLEEP -> actLounge(e, t, floorY, u, sleep = true, sm = smoother)
             Act.WANDER -> drawPlumber(smoother.smooth(poseWander(e, t, size.width, u, variant.intValue), t, e), floorY, u)
         }
     }
@@ -549,5 +573,95 @@ private fun poseTub(e: Float, t: Float, left: Float, w: Float, u: Float): Pose {
         e < 14.0f -> P(lieX + 40 * u, t, armR = 40f, grin = -0.3f, wrench = false)
         e < 15.4f -> P(lieX + 40 * u, t, carry = 2, grin = 1f, wink = e > 14.5f, armR = 60f, wrench = false) // usměje se na kachničku
         else -> { val (r, l) = walkArms(t); P(lp(lieX + 40 * u, w + 80 * u, ez(sg(e, 15.4f, 19f))), t, run = 0.6f, armR = 60f, armL = l, carry = 2, grin = 0.7f, wrench = false) }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Po práci: křeslo, televize, pivo – a od osmi večer spánek
+// ---------------------------------------------------------------------------------------------
+
+private fun DrawScope.actLounge(e: Float, t: Float, floorY: Float, u: Float, sleep: Boolean, sm: PoseSmoother) {
+    val w = size.width
+    val chairX = w * 0.34f
+    val tvX = w * 0.76f
+    // televize na stolku
+    val tvW = 84 * u
+    val tvH = 56 * u
+    val tvTop = floorY - 40 * u - tvH
+    drawRoundRect(Color(0xFF241A14), Offset(tvX - 40 * u, floorY - 40 * u), Size(80 * u, 40 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(3 * u))
+    drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF8A5A36), Color(0xFF5E3A20))), Offset(tvX - 38 * u, floorY - 38 * u), Size(76 * u, 37 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
+    drawLine(Color(0xFF3E2716), Offset(tvX - 30 * u, floorY - 20 * u), Offset(tvX + 30 * u, floorY - 20 * u), strokeWidth = 1.5f * u)
+    drawRoundRect(Color(0xFF15191F), Offset(tvX - tvW / 2, tvTop), Size(tvW, tvH), cornerRadius = androidx.compose.ui.geometry.CornerRadius(5 * u))
+    val scr = Rect(tvX - tvW / 2 + 5 * u, tvTop + 5 * u, tvX + tvW / 2 - 5 * u, tvTop + tvH - 5 * u)
+    if (!sleep) {
+        // fotbal: trávník, čáry, míč a hráči; obrazovka trochu bliká
+        val flick = 0.9f + 0.1f * sin(t * 23f)
+        drawRect(Brush.verticalGradient(listOf(Color(0xFF3FAE4A).copy(alpha = flick), Color(0xFF237A2E))), scr.topLeft, scr.size)
+        drawLine(Color.White.copy(alpha = 0.7f), Offset(scr.center.x, scr.top), Offset(scr.center.x, scr.bottom), strokeWidth = 1 * u)
+        drawCircle(Color.White.copy(alpha = 0.7f), 9 * u, scr.center, style = Stroke(1 * u))
+        val bx = scr.left + scr.width * (0.5f + 0.42f * sin(t * 0.9f))
+        val by = scr.top + scr.height * (0.5f + 0.35f * sin(t * 1.7f))
+        for (i in 0 until 4) {
+            val px = scr.left + scr.width * (0.5f + 0.4f * sin(t * 0.9f - 0.4f - i * 0.5f))
+            val py = scr.top + scr.height * (0.3f + 0.15f * i)
+            drawCircle(if (i % 2 == 0) Color(0xFFE53935) else Color(0xFF1E88E5), 2.2f * u, Offset(px, py))
+        }
+        drawCircle(Color.White, 1.8f * u, Offset(bx, by))
+        if (e in 17.6f..19.6f) { // GÓL – obrazovka bliká
+            drawRect(Color.White.copy(alpha = 0.35f * abs(sin(t * 14f))), scr.topLeft, scr.size)
+        }
+        // záře obrazovky do pokoje
+        drawCircle(Brush.radialGradient(listOf(Color(0x3360C0FF), Color.Transparent), center = scr.center, radius = 140 * u), 140 * u, scr.center)
+    } else {
+        drawRect(Brush.linearGradient(listOf(Color(0xFF1C232C), Color(0xFF0E1116)), start = scr.topLeft, end = scr.bottomRight), scr.topLeft, scr.size)
+        drawLine(Color.White.copy(alpha = 0.12f), Offset(scr.left + 6 * u, scr.top + 4 * u), Offset(scr.left + 24 * u, scr.top + 22 * u), strokeWidth = 3 * u)
+        drawCircle(Color(0xFFE53935), 1.4f * u, Offset(tvX + tvW / 2 - 8 * u, tvTop + tvH - 3 * u)) // pohotovostní kontrolka
+    }
+    // křeslo – zadní opěradlo
+    val chair = Color(0xFF9C3B2E)
+    val chairDark = Color(0xFF6A241B)
+    drawRoundRect(Color(0xFF241A14), Offset(chairX - 44 * u, floorY - 86 * u), Size(30 * u, 80 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(12 * u))
+    drawRoundRect(Brush.horizontalGradient(listOf(chairDark, chair)), Offset(chairX - 42 * u, floorY - 84 * u), Size(26 * u, 76 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(11 * u))
+    // Kutil sedí
+    val pose = sm.smooth(poseLounge(e, t, chairX, u, sleep), t, e)
+    drawPlumber(pose, floorY - 14 * u, u)
+    // sedák a područka přes nohy
+    drawRoundRect(Color(0xFF241A14), Offset(chairX - 44 * u, floorY - 30 * u), Size(70 * u, 26 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(9 * u))
+    drawRoundRect(Brush.verticalGradient(listOf(chair, chairDark)), Offset(chairX - 42 * u, floorY - 28 * u), Size(66 * u, 22 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(8 * u))
+    drawRoundRect(Color(0xFF241A14), Offset(chairX - 44 * u, floorY - 6 * u), Size(70 * u, 6 * u))
+    for (fx in listOf(chairX - 36 * u, chairX + 16 * u)) drawRect(Color(0xFF3E2716), Offset(fx, floorY - 2 * u), Size(5 * u, 4 * u))
+    // prázdné láhve u křesla (přibývají během večera)
+    val bottles = if (sleep) 4 else 2
+    for (i in 0 until bottles) {
+        val bx = chairX + 34 * u + i * 9 * u
+        val lying = sleep && i == bottles - 1
+        rotate(if (lying) 90f else 0f, Offset(bx, floorY - 3 * u)) {
+            drawRoundRect(Color(0xFF241A14), Offset(bx - 3.5f * u, floorY - 20 * u), Size(7 * u, 20 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.5f * u))
+            drawRoundRect(Color(0xFF6B4A12), Offset(bx - 2.5f * u, floorY - 19 * u), Size(5 * u, 18 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
+            drawRect(Color(0xFFE8D8A8), Offset(bx - 2.5f * u, floorY - 12 * u), Size(5 * u, 5 * u))
+        }
+    }
+}
+
+private fun poseLounge(e: Float, t: Float, chairX: Float, u: Float, sleep: Boolean): Pose {
+    val x = chairX - 10 * u
+    if (sleep) {
+        // spí s pootevřenou pusou, hlava mu padá, ruka s korbelem na bříšku
+        return P(x, t, sit = 1f, tilt = -10f + 2f * sin(t * 0.8f), lean = -0.15f, armR = 30f, armL = 10f, closed = true, zzz = true, grin = 0f, carry = 3)
+    }
+    return when {
+        e < 3f -> P(x, t, sit = 1f, armR = 35f, armL = 15f, grin = 0.3f, carry = 3)
+        e < 5.5f -> { // napije se
+            val k = sin(sg(e, 3f, 5.5f) * PI.toFloat())
+            P(x, t, sit = 1f, armR = lp(35f, 165f, k), armL = 15f, tilt = -8f * k, grin = 0f, carry = 3)
+        }
+        e < 9.0f -> P(x, t, sit = 1f, armR = 35f, armL = 15f, grin = 0.5f, carry = 3)
+        e < 10.2f -> P(x, t + 0f, sit = 1f, armR = 40f, armL = 15f, tilt = 4f * sin(t * 30f) * (1 - sg(e, 9.2f, 10.2f)), grin = 1f, carry = 3) // krk
+        e < 13f -> P(x, t, sit = 1f, armR = 35f, armL = 55f + 10f * sin(t * 8f), grin = 0.6f, carry = 3) // drbe se na bříšku
+        e < 15.5f -> P(x, t, sit = 1f, armR = 35f, armL = 15f, tilt = 3f * sin(t * 22f), grin = 1f, carry = 3) // směje se
+        e < 17.6f -> P(x, t, sit = 1f, armR = 40f, armL = 20f, grin = -0.5f, lean = 0.2f, carry = 3) // napjatě sleduje
+        e < 19.6f -> P(x, t, sit = 1f - 0.4f * sin(sg(e, 17.6f, 19.6f) * PI.toFloat()), armR = 170f, armL = -165f, grin = 1f, carry = 3) // GÓÓÓL!
+        e < 22f -> { val k = sin(sg(e, 19.8f, 22f) * PI.toFloat()); P(x, t, sit = 1f, armR = lp(35f, 165f, k), armL = 15f, tilt = -8f * k, carry = 3) }
+        else -> P(x, t, sit = 1f, armR = 35f, armL = 15f, grin = 0.4f, carry = 3)
     }
 }

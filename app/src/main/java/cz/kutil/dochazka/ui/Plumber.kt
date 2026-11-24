@@ -61,7 +61,7 @@ internal object T {
 }
 
 /** Zvukové okamžiky scénky (čas od začátku → zvuk). */
-enum class GagSound { BURST_START, BURST_STOP, SPLASH, CLANK, BOING, THUD, PLOP, GURGLE, POP, FLUSH, SNORE, SQUEAK }
+enum class GagSound { BURST_START, BURST_STOP, SPLASH, CLANK, BOING, THUD, PLOP, GURGLE, POP, FLUSH, SNORE, SQUEAK, BURP, CHEER }
 
 /** Scénky se střídají. */
 enum class GagScene { PIPE, TOILET }
@@ -861,6 +861,16 @@ internal fun DrawScope.drawArmLimb(sh: Offset, angle: Float, u: Float, back: Boo
                     close()
                 }
                 outlined(cup, Brush.verticalGradient(listOf(Color(0xFFD63A2F), Color(0xFF8E1B1B)), startY = end.y, endY = end.y + 9 * u), u)
+            }
+            if (p.carry == 3) {
+                // korbel piva (horní okraj s pěnou je u ruky – při zvednutí k puse se nakloní)
+                val mug = androidx.compose.ui.geometry.Rect(tip.x - 6 * u, tip.y - 4 * u, tip.x + 6 * u, tip.y + 12 * u)
+                drawRoundRect(Outline, Offset(mug.left - 1 * u, mug.top - 1 * u), Size(mug.width + 2 * u, mug.height + 2 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.5f * u))
+                drawRoundRect(Brush.horizontalGradient(listOf(Color(0xFFF2B21B), Color(0xFFC77D0A)), startX = mug.left, endX = mug.right), mug.topLeft, mug.size, cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
+                drawRoundRect(Color.White, Offset(mug.left - 0.5f * u, mug.top - 1.5f * u), Size(mug.width + 1 * u, 4 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
+                drawLine(Color.White.copy(alpha = 0.6f), Offset(mug.left + 2.5f * u, mug.top + 4 * u), Offset(mug.left + 2.5f * u, mug.bottom - 2 * u), strokeWidth = 1.2f * u)
+                drawArc(Outline, -90f, 180f, false, Offset(mug.right - 3 * u, mug.top + 2 * u), Size(8 * u, 9 * u), style = Stroke(2.6f * u))
+                drawArc(Color(0xFFE8E2D0), -90f, 180f, false, Offset(mug.right - 3 * u, mug.top + 2 * u), Size(8 * u, 9 * u), style = Stroke(1.4f * u))
             }
             if (p.tape) {
                 drawCircle(Outline, 6.4f * u, Offset(tip.x, tip.y + 3 * u), style = Stroke(4.6f * u))

@@ -196,8 +196,33 @@ def snore():
     save('gag_snore', x, -16)
 
 
+def burp():
+    total = 0.55
+    n = int(total * SR); t = np.arange(n) / SR
+    f0 = 95 + 25 * np.sin(2 * np.pi * 5 * t)
+    ph = 2 * np.pi * np.cumsum(f0) / SR
+    # hrubý hlasivkový tón + formant
+    src = np.sign(np.sin(ph)) * 0.5 + np.sin(ph) * 0.5 + np.sin(3 * ph) * 0.3
+    env = np.minimum(1, t / 0.04) * np.exp(-np.maximum(0, t - 0.3) / 0.08)
+    x = src * env * (0.8 + 0.2 * rng.normal(0, 1, n))
+    save('gag_burp', x, -15)
+
+
+def cheer():
+    # krátké „jéé!“ – stoupající hlasový tón s formantem
+    total = 0.7
+    n = int(total * SR); t = np.arange(n) / SR
+    f0 = 210 + 140 * np.minimum(1, t / 0.25)
+    ph = 2 * np.pi * np.cumsum(f0) / SR
+    x = sum(np.sin(k * ph) / k * (1.6 if 2 <= k <= 4 else 1) for k in range(1, 12))
+    x = x * np.minimum(1, t / 0.03) * np.exp(-np.maximum(0, t - 0.45) / 0.09)
+    save('gag_cheer', x, -16)
+
+
 drip()
 overflow()
+burp()
+cheer()
 squeak()
 snore()
 plop()

@@ -53,6 +53,8 @@ class WaterSounds(ctx: Context) {
     private val flush = pool.load(ctx, R.raw.gag_flush, 1)
     private val squeak = pool.load(ctx, R.raw.gag_squeak, 1)
     private val snore = pool.load(ctx, R.raw.gag_snore, 1)
+    private val burp = pool.load(ctx, R.raw.gag_burp, 1)
+    private val cheer = pool.load(ctx, R.raw.gag_cheer, 1)
     private var overflowStream = 0
     private var sprayStream = 0
 
@@ -74,6 +76,8 @@ class WaterSounds(ctx: Context) {
             GagSound.POP -> pool.play(popS, 0.25f, 0.25f, 1, 0, 1f)
             GagSound.SQUEAK -> pool.play(squeak, 0.22f, 0.22f, 1, 0, 1f)
             GagSound.SNORE -> pool.play(snore, 0.25f, 0.25f, 1, 0, 1f)
+            GagSound.BURP -> pool.play(burp, 0.2f, 0.2f, 1, 0, 1f)
+            GagSound.CHEER -> pool.play(cheer, 0.18f, 0.18f, 1, 0, 1f)
             GagSound.FLUSH -> pool.play(flush, 0.20f, 0.20f, 1, 0, 1f)
         }
     }
