@@ -155,14 +155,11 @@ val WaterZone: Dp = 46.dp
 /** Kde je ústí kohoutku vůči pravému okraji panelu. */
 val FaucetNozzleFromEnd: Dp = 114.dp
 
-// Rozměry 3D kohoutku (tools/render_realism.py): obrázek 600×400, ústí v 24,67 % šířky a 68,84 % výšky.
-private val FaucetW: Dp = 170.dp
-private val FaucetH: Dp = 113.dp
-private const val NOZZLE_FY = 0.6884f
-private const val WHEEL_FX = 0.5433f
-private const val WHEEL_FY = 0.10f
-private const val WHEEL_FW = 0.2467f
-private const val WHEEL_FH = 0.175f
+// Kohoutek z balíku grafiky (graphics/valves/vodovodni-kohoutek.png, 740×430), zrcadlově:
+// přívod vpravo u okraje obrazovky, ústí podle PRIPOJOVACI_BODY.json v (1 − 0,852; 0,8323).
+private val FaucetW: Dp = 150.dp
+private val FaucetH: Dp = 87.2.dp
+private const val NOZZLE_FY = 0.8323f
 
 /** Kdy kapka dopadla na hladinu (fáze v periodě kapání) – zapisuje kreslení, čte zvuk. */
 class DripSync { @Volatile var impactPhase: Float = -1f }
@@ -405,26 +402,12 @@ fun DrawScope.drawDrop(c: Offset, r: Float, stretch: Float) {
 
 @Composable
 fun Faucet(water: WaterState, modifier: Modifier = Modifier) {
-    val spin = water.valveSpin
-    // při otevření / zavření se kolo otočí o 1,5 otáčky; 6 předrenderovaných fází na 90°
-    val frame = if (spin > 0f) (((spin * 540f) / 15f).toInt() % 6) else 0
-    val wheel = when (frame) {
-        1 -> R.drawable.faucet_wheel_1
-        2 -> R.drawable.faucet_wheel_2
-        3 -> R.drawable.faucet_wheel_3
-        4 -> R.drawable.faucet_wheel_4
-        5 -> R.drawable.faucet_wheel_5
-        else -> R.drawable.faucet_wheel_0
-    }
-    Box(modifier.size(FaucetW, FaucetH)) {
-        Image(painterResource(R.drawable.faucet_body), contentDescription = null, modifier = Modifier.fillMaxSize())
-        Image(
-            painterResource(wheel), contentDescription = null,
-            modifier = Modifier
-                .offset(x = FaucetW * WHEEL_FX, y = FaucetH * WHEEL_FY)
-                .size(FaucetW * WHEEL_FW, FaucetH * WHEEL_FH),
-        )
-    }
+    // při otevírání / zavírání se kohoutek krátce zachvěje (kohoutek je jeden obrázek)
+    val shake = if (water.valveSpin > 0f) 2f * sin(water.valveSpin * 40f) else 0f
+    Image(
+        painterResource(R.drawable.g_kohoutek), contentDescription = null,
+        modifier = modifier.size(FaucetW, FaucetH).graphicsLayer { scaleX = -1f; rotationZ = shake },
+    )
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -433,42 +416,48 @@ fun Faucet(water: WaterState, modifier: Modifier = Modifier) {
 
 @Composable
 fun SidePipes(clock: State<Float>, water: WaterState, animate: Boolean, modifier: Modifier = Modifier) {
-    val pipes = rememberPipeImages()
+    val long = ImageBitmap.imageResource(R.drawable.g_trubka_dlouha)
+    val glass = ImageBitmap.imageResource(R.drawable.g_trubka_pruhledna)
+    val joint = ImageBitmap.imageResource(R.drawable.g_spojka)
+    val cast = ImageBitmap.imageResource(R.drawable.g_litina)
     Canvas(modifier.fillMaxSize()) {
-        val d = 20.dp.toPx()
-        val k = d / 64f
-        val s = pipes.tl.width * k
+        val d = 26.dp.toPx() // vizuální průměr trubek
         val t = if (animate) clock.value else 0f
-        fun img(i: androidx.compose.ui.graphics.ImageBitmap, x: Float, y: Float, w: Float, h: Float) = drawImage(
-            i, srcOffset = androidx.compose.ui.unit.IntOffset.Zero, srcSize = androidx.compose.ui.unit.IntSize(i.width, i.height),
-            dstOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt()), dstSize = androidx.compose.ui.unit.IntSize(w.toInt(), h.toInt()),
-            filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
-        )
-        // levá svislá trubka u okraje (napůl za okrajem obrazovky)
-        val lx = -d * 0.45f
+        /** Vodorovný obrázek trubky otočený svisle; [top]..[top+len] na ose x = [cx]. */
+        fun vertical(img: ImageBitmap, cx: Float, top: Float, len: Float, thick: Float = d) {
+            if (len <= 0f) return
+            rotate(90f, Offset(cx, top + len / 2)) {
+                drawImage(
+                    img, srcOffset = androidx.compose.ui.unit.IntOffset.Zero, srcSize = androidx.compose.ui.unit.IntSize(img.width, img.height),
+                    dstOffset = androidx.compose.ui.unit.IntOffset((cx - len / 2).toInt(), (top + len / 2 - thick / 2).toInt()),
+                    dstSize = androidx.compose.ui.unit.IntSize(len.toInt(), thick.toInt()),
+                    filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+                )
+            }
+        }
+        // levá svislá trubka u okraje, uprostřed průhledný úsek s vodou
+        val lx = d * 0.12f
         val glassTop = size.height * 0.30f
         val glassLen = size.height * 0.20f
-        img(pipes.v, lx, 0f, d, glassTop)
-        img(pipes.v, lx, glassTop + glassLen, d, size.height * 0.68f - glassTop - glassLen)
-        drawGlassTube(Rect(lx, glassTop, lx + d, glassTop + glassLen), t, water.flow)
-        for (y in listOf(glassTop - 6.dp.toPx(), glassTop + glassLen - 3.dp.toPx())) {
-            img(pipes.clampV, lx + d / 2 - pipes.clampV.width * k / 2, y, pipes.clampV.width * k, pipes.clampV.height * k)
-        }
-        // pravá trubka dole s měděnou spojkou (ke vpusti)
-        val rx = size.width - d * 0.55f
-        val ry = size.height * 0.74f
-        img(pipes.v, rx, ry, d, size.height - ry)
-        img(pipes.copper, rx - d * 0.06f, ry + d * 1.2f, d * 1.12f, d * 1.5f)
+        val endY = size.height * 0.68f
+        vertical(long, lx, -d * 0.4f, glassTop + d * 0.5f)
+        vertical(glass, lx, glassTop, glassLen, d * 1.05f)
+        drawGlassTube(Rect(lx - d * 0.22f, glassTop + d * 0.35f, lx + d * 0.22f, glassTop + glassLen - d * 0.35f), t, water.flow)
+        vertical(long, lx, glassTop + glassLen - d * 0.1f, endY - glassTop - glassLen)
+        for (y in listOf(glassTop, glassTop + glassLen)) vertical(joint, lx, y - d * 0.55f, d * 1.1f, d * 1.15f)
+        // pravá litinová trubka dole (svod ke vpusti)
+        val rx = size.width - d * 0.15f
+        val ry = size.height * 0.72f
+        vertical(cast, rx, ry, size.height - ry + d)
+        vertical(joint, rx, ry - d * 0.2f, d * 1.1f, d * 1.15f)
     }
 }
 
 private fun DrawScope.drawGlassTube(r: Rect, t: Float, flow: Float) {
-    // sklo
-    drawRect(Brush.horizontalGradient(listOf(Color(0x5582C8FF), Color(0x22FFFFFF), Color(0x55195FAF)), startX = r.left, endX = r.right), r.topLeft, r.size)
     // voda uvnitř: proudí dolů, při práci jemně podsvícená
     val water = Rect(r.left + r.width * 0.18f, r.top, r.right - r.width * 0.18f, r.bottom)
     clipRect(water.left, water.top, water.right, water.bottom) {
-        drawRect(Color(0xFF1E78D8).copy(alpha = 0.35f + 0.35f * flow), water.topLeft, water.size)
+        drawRect(Color(0xFF1E78D8).copy(alpha = 0.10f + 0.25f * flow), water.topLeft, water.size)
         val band = 26.dp.toPx()
         val off = (t * 30.dp.toPx() * flow) % band
         var y = water.top - band + off
@@ -485,50 +474,11 @@ private fun DrawScope.drawGlassTube(r: Rect, t: Float, flow: Float) {
     }
     // modré podsvícení aktivního úseku
     if (flow > 0f) drawRect(Color(0xFF4FB4FF).copy(alpha = 0.18f * flow), Offset(r.left - 4.dp.toPx(), r.top), Size(r.width + 8.dp.toPx(), r.height))
-    drawLine(Color.White.copy(alpha = 0.6f), Offset(r.left + r.width * 0.28f, r.top), Offset(r.left + r.width * 0.28f, r.bottom), strokeWidth = 1.5f * density)
 }
 
 // ---------------------------------------------------------------------------------------------
 // Odpadní vpusť s vírem
 // ---------------------------------------------------------------------------------------------
-
-@Composable
-fun AnimatedDrain(clock: State<Float>, water: WaterState, animate: Boolean, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            val c = Offset(size.width / 2, size.height / 2 + 4.dp.toPx())
-            val t = if (animate) clock.value else 0f
-            val flat = 0.5f // stejná perspektiva jako vyrenderovaná vpusť
-            // mokrá podlaha a mělká voda kolem vpusti
-            drawOval(
-                Brush.radialGradient(listOf(Color(0x7046A8FF), Color(0x302A6FC0), Color(0x00143A6E)), center = c, radius = size.width * 0.38f),
-                Offset(c.x - size.width * 0.42f, c.y - size.width * 0.42f * flat), Size(size.width * 0.84f, size.width * 0.84f * flat),
-            )
-            // vír: proudnice stáčející se k vpusti (rychlejší, když teče voda)
-            val speed = 18f + 40f * water.flow
-            for (i in 0 until 5) {
-                val rw = (92f + i * 14f) * density
-                rotate(t * speed * (1f - i * 0.1f) + i * 63f, c) {
-                    drawArc(
-                        Color(0xFFCFEAFF).copy(alpha = 0.30f - i * 0.04f),
-                        startAngle = 0f, sweepAngle = 70f + i * 8f, useCenter = false,
-                        topLeft = Offset(c.x - rw, c.y - rw * flat), size = Size(rw * 2, rw * 2 * flat),
-                        style = Stroke(width = (1.8f - i * 0.2f) * density),
-                    )
-                }
-            }
-            if (animate) {
-                for (i in 0 until 4) {
-                    val q = ((t * 0.25f + i * 0.25f) % 1f)
-                    val ang = t * 1.2f + i * 1.6f
-                    val rr = (110f - 40f * q) * density
-                    drawCircle(Color.White.copy(alpha = 0.65f * (1 - q)), (1.4f + i % 2) * density, Offset(c.x + rr * cos(ang), c.y + rr * flat * sin(ang)), style = Stroke(1f * density))
-                }
-            }
-        }
-        Image(painterResource(R.drawable.drain_persp), null, Modifier.size(150.dp, 100.dp))
-    }
-}
 
 // ---------------------------------------------------------------------------------------------
 // Pulzující indikátor stavu (GPS)
@@ -585,7 +535,7 @@ fun OverflowOverlay(
     drainOnly: Boolean = false,
 ) {
     val k by animateFloatAsState(if (overflowing) 1f else 0f, tween(if (animate) 2200 else 0), label = "overflow")
-    val grate = ImageBitmap.imageResource(R.drawable.drain_persp)
+    val grate = ImageBitmap.imageResource(R.drawable.g_odtokova_mrizka)
     var origin by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Offset.Zero) }
     Canvas(
         modifier.onGloballyPositioned { origin = it.positionInRoot() },
@@ -641,7 +591,7 @@ fun OverflowOverlay(
                 }
             }
         }
-        val gw = 70 * u
+        val gw = 64 * u
         val gh = gw * grate.height / grate.width
         drawImage(
             grate, srcOffset = androidx.compose.ui.unit.IntOffset.Zero, srcSize = androidx.compose.ui.unit.IntSize(grate.width, grate.height),

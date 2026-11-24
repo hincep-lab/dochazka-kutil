@@ -233,22 +233,12 @@ fun DrainFooter(modifier: Modifier = Modifier) {
     }
 }
 
-/** Ozdobné koleno v pravém horním rohu horní lišty. */
+/** Ozdobné koleno (graphics/pipes/koleno-90) v pravém horním rohu horní lišty. */
 @Composable
 fun TopBarPipe(modifier: Modifier = Modifier) {
-    val pipes = rememberPipeImages()
-    Box(
-        modifier.size(76.dp, 56.dp).drawWithContent {
-            val d = PipeD.toPx()
-            val k = d / SRC_D
-            val s = pipes.tl.width * k
-            val y = size.height * 0.14f
-            val x = size.width * 0.18f
-            img(pipes.h, x + s - 1, y, size.width - x - s + 2, d)
-            img(pipes.tl, x, y, s, s)
-            img(pipes.v, x, y + s - 1, d, size.height - y - s + 2)
-            img(pipes.copper, size.width - d * 1.6f, y - d * 0.06f, d * 1.3f, d * 1.12f)
-        },
+    Image(
+        painterResource(R.drawable.g_koleno_90), contentDescription = null,
+        modifier = modifier.padding(top = 4.dp).size(70.dp, 50.dp),
     )
 }
 
