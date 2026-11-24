@@ -133,7 +133,7 @@ class ScreenshotTests {
     fun appCalendar() = app("05_kalendar", "calendar")
 
     @Test
-    fun appMonth() = app("06_vykaz", "month")
+    fun appMonth() = app("06_vykaz", "month:" + java.time.YearMonth.now(PRAGUE))
 
     @Test
     fun appPending() = app("07_potvrdit", "pending")

@@ -109,7 +109,6 @@ fun HomeScreen(
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
             Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
                 Icon(painterResource(R.drawable.ic_handyman), null, tint = Color.White, modifier = Modifier.size(50.dp))
-                Icon(painterResource(R.drawable.ic_build), null, tint = Ind.orange, modifier = Modifier.size(22.dp).align(Alignment.BottomEnd))
             }
             Spacer(Modifier.size(10.dp))
             Column(Modifier.weight(1f)) {
@@ -233,7 +232,11 @@ fun HomeScreen(
         if (day.pieces.isNotEmpty() || runningToday || day.override != null || day.holidayName != null) {
             SteelCard(onClick = { onOpenDay(today) }) {
                 SectionTitle("Dnešní práce", iconRes = R.drawable.ic_assignment) {
-                    Text(hm(day.minutes), fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = Ind.text)
+                    val running = if (open != null && runningToday) {
+                        val s0 = open.editedStart ?: Rounding.roundToHalfHour(Instant.ofEpochMilli(open.rawStart)).toEpochMilli()
+                        ((now - s0) / 60_000).coerceAtLeast(0)
+                    } else 0L
+                    Text(hm(day.minutes + running), fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = Ind.text)
                 }
                 day.holidayName?.let { Text("Státní svátek: $it", color = Ind.amberText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                 day.override?.let { Text(it.label, color = Ind.blue, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }

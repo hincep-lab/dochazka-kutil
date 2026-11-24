@@ -79,7 +79,7 @@ import kotlin.math.roundToInt
 // =============================================================================================
 
 /** Průměr trubky na obrazovce. Obrázky jsou kreslené pro průměr 64 px. */
-val PipeD: Dp = 18.dp
+val PipeD: Dp = 22.dp
 private const val SRC_D = 64f
 
 class PipeImages(
@@ -153,15 +153,15 @@ fun DrawScope.drawPipeFrame(p: PipeImages, r: Rect, d: Float, valve: Boolean, va
         }
     }
     if (valve) {
-        val w = p.valve.width * k * 1.05f
-        val h = p.valve.height * k * 1.05f
+        val w = p.valve.width * k * 1.25f
+        val h = p.valve.height * k * 1.25f
         // spodek hlavy ventilu (cca 150/168 výšky obrázku) sedí na ose trubky
         img(p.valve, r.left + r.width * valveAt - w / 2, r.top + d / 2 - h * 0.9f, w, h)
     }
 }
 
 /** Výška, o kterou šoupátko přesahuje rám nahoru. */
-val ValveOverhang: Dp = 40.dp
+val ValveOverhang: Dp = 58.dp
 
 @Composable
 fun PipeFrame(modifier: Modifier = Modifier, valve: Boolean = true, content: @Composable BoxScope.() -> Unit) {
@@ -173,7 +173,7 @@ fun PipeFrame(modifier: Modifier = Modifier, valve: Boolean = true, content: @Co
                 drawContent()
                 drawPipeFrame(pipes, Rect(0f, 0f, size.width, size.height), PipeD.toPx(), valve)
             }
-            .padding(PipeD / 2 + 1.dp),
+            .padding(PipeD / 2 + 3.dp),
         content = content,
     )
 }

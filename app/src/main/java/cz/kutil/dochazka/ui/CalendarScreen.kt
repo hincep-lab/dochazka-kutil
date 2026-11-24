@@ -157,7 +157,7 @@ fun CalendarScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> 
             }
             if (d.workLabels.isNotEmpty()) Text(d.workLabels.joinToString(" · "), color = Ind.amberText, fontSize = 13.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                BigActionButton("Upravit / doplnit", ActionKind.ACCENT, Modifier.weight(1f), icon = Icons.Filled.Edit, height = 52.dp) { onOpenDay(sel) }
+                BigActionButton("Upravit", ActionKind.ACCENT, Modifier.weight(1f), icon = Icons.Filled.Edit, height = 52.dp) { onOpenDay(sel) }
                 BigActionButton("Dovolená", ActionKind.METAL, Modifier.weight(1f), icon = Icons.Filled.Star, height = 52.dp) { vacationDialog = true }
             }
             Text(
