@@ -2,6 +2,14 @@
 
 package cz.kutil.dochazka.ui
 
+import cz.kutil.dochazka.R
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.background
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -102,7 +110,7 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Další měsíc")
             }
         }
-        Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        SteelCard(Modifier.padding(horizontal = 16.dp), padding = 0.dp) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Odpracováno celkem: ${WorkCalc.formatHm(month.totalMinutes)} h", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 val workedDays = month.days.count { it.pieces.isNotEmpty() }
@@ -131,7 +139,6 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
         LazyColumn(Modifier.fillMaxSize().padding(top = 8.dp)) {
             items(days, key = { it.date.toString() }) { d ->
                 DayRow(d, d.date in unconfirmed) { onOpenDay(d.date) }
-                HorizontalDivider()
             }
         }
     }
@@ -213,28 +220,42 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
 @Composable
 private fun DayRow(d: DaySummary, unconfirmed: Boolean, onClick: () -> Unit) {
     val special = d.flags.isNotEmpty()
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.width(64.dp)) {
-            Text(
-                "${d.date.dayOfMonth}. ${Fmt.dowShort(d.date)}",
-                fontWeight = FontWeight.Bold,
-                color = if (special) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
-            )
-        }
-        Column(Modifier.weight(1f)) {
-            if (d.pieces.isNotEmpty()) Text(d.pieces.joinToString(",  ") { "${it.startText()}–${it.endText()}" })
-            d.override?.let { Text(if (it == OverrideType.DOVOLENA) "Dovolená" else "${it.code} – ${it.label}", style = MaterialTheme.typography.bodySmall) }
-            if (d.workLabels.isNotEmpty()) {
-                Text(d.workLabels.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
-            } else if (DayFlag.HOLIDAY in d.flags) {
-                Text("Svátek: ${d.holidayName}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+    val bar = when {
+        unconfirmed -> Ind.orange
+        d.pieces.isNotEmpty() -> Ind.green
+        d.override != null -> Ind.blue
+        else -> Color(0xFFB7C1CE)
+    }
+    Box(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp)) {
+        SteelCard(padding = 0.dp, onClick = onClick) {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(7.dp).fillMaxHeight().background(bar))
+                Icon(
+                    painterResource(R.drawable.ic_calendar_month), null,
+                    tint = if (special) Color(0xFFD32F2F) else Ind.textDim,
+                    modifier = Modifier.padding(start = 12.dp, end = 10.dp).size(24.dp),
+                )
+                Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
+                    Text(
+                        "${Fmt.dowShort(d.date)} ${Fmt.dateShort(d.date)}",
+                        fontWeight = FontWeight.ExtraBold, fontSize = 17.sp,
+                        color = if (special) Color(0xFFD32F2F) else Ind.text,
+                    )
+                    if (d.pieces.isNotEmpty()) Text(d.pieces.joinToString(",  ") { "${it.startText()}–${it.endText()}" }, fontSize = 14.sp, color = Ind.textDim)
+                    d.override?.let { Text(if (it == OverrideType.DOVOLENA) "Dovolená" else "${it.code} – ${it.label}", fontSize = 14.sp, color = Ind.blue, fontWeight = FontWeight.SemiBold) }
+                    if (d.workLabels.isNotEmpty()) {
+                        Text(d.workLabels.joinToString(" · "), fontSize = 13.sp, color = Ind.amberText)
+                    } else if (DayFlag.HOLIDAY in d.flags) {
+                        Text("Svátek: ${d.holidayName}", fontSize = 13.sp, color = Ind.amberText)
+                    }
+                    if (unconfirmed) Text("Čeká na potvrzení", fontSize = 13.sp, color = Color(0xFFC62828), fontWeight = FontWeight.Bold)
+                }
+                if (d.minutes > 0) {
+                    Text("${d.minutes / 60} h ${"%02d".format(d.minutes % 60)} min", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = Ind.text)
+                }
+                Icon(painterResource(R.drawable.ic_chevron_right), null, tint = Ind.textMuted, modifier = Modifier.padding(horizontal = 6.dp).size(24.dp))
             }
-            if (unconfirmed) Text("Čeká na potvrzení", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
-        Text(if (d.minutes > 0) WorkCalc.formatHm(d.minutes) else "", fontWeight = FontWeight.Bold)
     }
 }
 
@@ -284,7 +305,7 @@ fun DayDetailScreen(vm: MainViewModel, state: UiState, date: LocalDate, onBack: 
         for (s in shifts) {
             val data = s.toData()
             val eff = WorkCalc.effective(data)
-            Card(Modifier.fillMaxWidth()) {
+            SteelCard(padding = 0.dp) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (eff == null) {
                         Text("Běží od ${Fmt.time(WorkCalc.effectiveStart(data))}", fontSize = 18.sp, fontWeight = FontWeight.Bold)

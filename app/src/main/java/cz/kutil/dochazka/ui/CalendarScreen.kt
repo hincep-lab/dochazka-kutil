@@ -93,7 +93,7 @@ fun CalendarScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> 
                 for ((i, d) in listOf("Po", "Út", "St", "Čt", "Pá", "So", "Ne").withIndex()) {
                     Text(
                         d, Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                        color = if (i >= 5) Color(0xFFFF8A80) else Ind.textDim,
+                        color = if (i >= 5) Color(0xFFD32F2F) else Ind.textDim,
                     )
                 }
             }
@@ -132,7 +132,7 @@ fun CalendarScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> 
             SectionTitle("${Fmt.dowLong(sel).replaceFirstChar { it.uppercase() }} ${Fmt.date(sel)}", Icons.Filled.DateRange) {
                 Text("${WorkCalc.formatHm(d.minutes)} h", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ind.text)
             }
-            d.holidayName?.let { Text("Státní svátek: $it", color = Ind.amber, fontSize = 13.sp) }
+            d.holidayName?.let { Text("Státní svátek: $it", color = Ind.amberText, fontSize = 13.sp) }
             d.override?.let { Text(if (it == OverrideType.DOVOLENA) "Dovolená" else "${it.code} – ${it.label}", color = Ind.blue, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
             if (d.pieces.isEmpty() && d.override == null) {
                 Text(
@@ -155,7 +155,7 @@ fun CalendarScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> 
                     fontSize = 13.sp, color = Ind.textDim,
                 )
             }
-            if (d.workLabels.isNotEmpty()) Text(d.workLabels.joinToString(" · "), color = Ind.amber, fontSize = 13.sp)
+            if (d.workLabels.isNotEmpty()) Text(d.workLabels.joinToString(" · "), color = Ind.amberText, fontSize = 13.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 BigActionButton("Upravit / doplnit", ActionKind.ACCENT, Modifier.weight(1f), icon = Icons.Filled.Edit, height = 52.dp) { onOpenDay(sel) }
                 BigActionButton("Dovolená", ActionKind.METAL, Modifier.weight(1f), icon = Icons.Filled.Star, height = 52.dp) { vacationDialog = true }
@@ -192,12 +192,12 @@ private fun DayCell(d: DaySummary, isToday: Boolean, isSelected: Boolean, attent
     val bg = when {
         isSelected -> Ind.orange
         isToday -> Color(0xFF2F6FE0)
-        else -> Color(0x1AFFFFFF)
+        else -> Color(0xFFF8FAFD)
     }
     val fg = when {
         isSelected -> Ind.onOrange
         isToday -> Color.White
-        weekendOrHoliday -> Color(0xFFFF8A80)
+        weekendOrHoliday -> Color(0xFFD32F2F)
         else -> Ind.text
     }
     val desc = "${d.date.dayOfMonth}. " + when {
@@ -211,7 +211,7 @@ private fun DayCell(d: DaySummary, isToday: Boolean, isSelected: Boolean, attent
             .aspectRatio(1f)
             .clip(RoundedCornerShape(12.dp))
             .background(bg)
-            .then(if (isToday && !isSelected) Modifier.border(1.dp, Color(0xFF9FC5FF), RoundedCornerShape(12.dp)) else Modifier)
+            .border(1.dp, if (isToday && !isSelected) Color(0xFF1F5FCC) else Color(0x33000000), RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .semantics { contentDescription = desc },
         contentAlignment = Alignment.Center,

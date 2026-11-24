@@ -6,6 +6,20 @@ import android.content.ClipData
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.sp
+import cz.kutil.dochazka.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Column
@@ -14,11 +28,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,16 +36,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -63,18 +67,18 @@ private fun StatusPill(state: UiState) {
     val scheme = MaterialTheme.colorScheme
     val open = state.openShift
     val triple = when {
-        state.demo -> Triple("DEMO", scheme.tertiaryContainer, scheme.onTertiaryContainer)
+        state.demo -> Triple("DEMO", Ind.orange, Ind.onOrange)
         open != null -> {
             val start = open.editedStart ?: Rounding.roundToHalfHour(Instant.ofEpochMilli(open.rawStart)).toEpochMilli()
-            Triple("V práci od ${Fmt.time(start)}", Ind.green, Color.White)
+            Triple("V práci od ${Fmt.time(start)}", Color(0xFF2E9A35), Color.White)
         }
-        state.openPending.isNotEmpty() -> Triple("Čeká dotaz", scheme.errorContainer, scheme.onErrorContainer)
+        state.openPending.isNotEmpty() -> Triple("Čeká dotaz", Ind.orange, Ind.onOrange)
         !state.settings.trackingEnabled -> Triple("Ruční režim", scheme.surfaceVariant, scheme.onSurfaceVariant)
         state.settings.trackState == "AWAY" || state.settings.trackState == "OUTSIDE_PENDING" ->
             Triple("Mimo domov", scheme.secondaryContainer, scheme.onSecondaryContainer)
         else -> Triple("Doma", scheme.secondaryContainer, scheme.onSecondaryContainer)
     }
-    Surface(shape = RoundedCornerShape(50), color = triple.second, modifier = Modifier.padding(end = 12.dp)) {
+    Surface(shape = RoundedCornerShape(50), color = triple.second, modifier = Modifier.padding(start = 6.dp)) {
         Text(
             triple.first,
             color = triple.third,
@@ -117,6 +121,11 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
             detailDate = null
             diag = false
             endDialog = true
+            requestedTab.value = null
+        } else if (requested == "calendar") {
+            tab = Tab.CALENDAR
+            detailDate = null
+            diag = false
             requestedTab.value = null
         } else if (requested == "settings") {
             tab = Tab.SETTINGS
@@ -188,82 +197,42 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
     }
 
     val showTopBar = detail != null || diag || tab != Tab.HOME
+    Box(Modifier.fillMaxSize()) {
+    WetBackground()
     Scaffold(
         containerColor = Color.Transparent,
-        modifier = Modifier.background(IndustrialBackground),
         topBar = {
             if (showTopBar) {
-            val today = Fmt.today()
-            val (title, subtitle) = when {
-                detail != null -> "${Fmt.dowLong(detail).replaceFirstChar { it.uppercase() }} ${Fmt.date(detail)}" to "Detail dne"
-                diag -> "Stav sledování" to "Diagnostika"
-                tab == Tab.HOME -> "Docházka Kutil" to "${Fmt.dowLong(today)} ${Fmt.date(today)}"
-                tab == Tab.CALENDAR -> "Kalendář" to "Pracovní dny a nepřítomnosti"
-                tab == Tab.MONTH -> "Výkaz" to "Měsíční přehled a export do Wordu / PDF"
-                tab == Tab.PENDING -> "K potvrzení" to "Nevyřízeno: ${state.openPending.size}"
-                else -> "Nastavení a další" to state.settings.organization
-            }
-            TopAppBar(
-                navigationIcon = {
-                    if (detail != null || diag) {
-                        IconButton(onClick = { if (detail != null) detailDate = null else diag = false }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zpět")
-                        }
-                    }
-                },
-                title = {
-                    Column {
-                        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                },
-                actions = { StatusPill(state) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Ind.bgTop, titleContentColor = Ind.text, navigationIconContentColor = Ind.text),
-            )
+                val (title, subtitle) = when {
+                    detail != null -> "${Fmt.dowLong(detail).replaceFirstChar { it.uppercase() }} ${Fmt.date(detail)}" to "Detail dne"
+                    diag -> "Stav sledování" to "Diagnostika"
+                    tab == Tab.CALENDAR -> "Kalendář" to "Pracovní dny a nepřítomnosti"
+                    tab == Tab.MONTH -> "Výkaz" to "Záznamy, export do Wordu a PDF"
+                    tab == Tab.PENDING -> "K potvrzení" to "Nevyřízeno: ${state.openPending.size}"
+                    else -> "Nastavení" to state.settings.organization
+                }
+                IndTopBar(
+                    title = title,
+                    subtitle = subtitle,
+                    onBack = when {
+                        detail != null -> ({ detailDate = null })
+                        diag -> ({ diag = false })
+                        else -> ({ tab = Tab.HOME })
+                    },
+                    trailing = { StatusPill(state) },
+                )
             }
         },
         bottomBar = {
-            NavigationBar(containerColor = Ind.bgDeep, contentColor = Ind.textDim, tonalElevation = 0.dp) {
-                for (t in Tab.entries) {
-                    NavigationBarItem(
-                        selected = tab == t && detail == null && !diag,
-                        onClick = {
-                            tab = t
-                            diag = false
-                            detailDate = null
-                        },
-                        icon = {
-                            val icon = when (t) {
-                                Tab.HOME -> Icons.Filled.Home
-                                Tab.CALENDAR -> Icons.Filled.DateRange
-                                Tab.MONTH -> Icons.AutoMirrored.Filled.List
-                                Tab.PENDING -> Icons.Filled.CheckCircle
-                                Tab.SETTINGS -> Icons.Filled.Settings
-                            }
-                            val count = state.openPending.size
-                            if (t == Tab.PENDING && count > 0) {
-                                BadgedBox(badge = { Badge { Text(count.toString()) } }) { Icon(icon, contentDescription = t.label) }
-                            } else {
-                                Icon(icon, contentDescription = t.label)
-                            }
-                        },
-                        label = { Text(t.label, fontWeight = FontWeight.SemiBold) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Ind.onOrange,
-                            selectedTextColor = Ind.orange,
-                            indicatorColor = Ind.orange,
-                            unselectedIconColor = Ind.textDim,
-                            unselectedTextColor = Ind.textDim,
-                        ),
-                    )
-                }
-            }
+            IndBottomBar(
+                selected = if (detail == null && !diag) tab else null,
+                pendingCount = state.openPending.size,
+                onSelect = { t ->
+                    tab = t
+                    diag = false
+                    detailDate = null
+                },
+            )
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
@@ -285,6 +254,73 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
                     Tab.MONTH -> MonthScreen(vm, state, onOpenDay = { detailDate = it.toString() })
                     Tab.PENDING -> PendingScreen(vm, state, onOpenDay = { detailDate = it.toString() })
                     Tab.SETTINGS -> SettingsScreen(vm, state, onOpenDiag = { diag = true })
+                }
+            }
+        }
+    }
+    }
+}
+
+private val BarText = PanelText
+
+@Composable
+private fun IndTopBar(title: String, subtitle: String, onBack: () -> Unit, trailing: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color(0xE60B1A30), Color(0x990B1A30), Color.Transparent)))
+            .statusBarsPadding(),
+    ) {
+        TopBarPipe(Modifier.align(Alignment.TopEnd))
+        Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 64.dp, top = 6.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zpět", tint = Ind.onBg)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Ind.onBg, maxLines = 1, overflow = TextOverflow.Ellipsis, style = BarText)
+                Text(subtitle, fontSize = 13.sp, color = Ind.onBgDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            trailing()
+        }
+    }
+}
+
+@Composable
+private fun IndBottomBar(selected: Tab?, pendingCount: Int, onSelect: (Tab) -> Unit) {
+    Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xF2132A4A), Color(0xFF07111F))))) {
+        Box(Modifier.fillMaxWidth().height(2.dp).background(Brush.horizontalGradient(listOf(Color(0xFF5E6F86), Color(0xFFDCE4EE), Color(0xFF5E6F86)))))
+        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 6.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (t in Tab.entries) {
+                val sel = t == selected
+                val icon = when (t) {
+                    Tab.HOME -> R.drawable.ic_home
+                    Tab.CALENDAR -> R.drawable.ic_calendar_month
+                    Tab.MONTH -> R.drawable.ic_assignment
+                    Tab.PENDING -> R.drawable.ic_check_circle
+                    Tab.SETTINGS -> R.drawable.ic_more_horiz
+                }
+                val shape = RoundedCornerShape(14.dp)
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(shape)
+                        .background(
+                            if (sel) Brush.verticalGradient(listOf(Color(0xFF4E8DF0), Color(0xFF1F5FCC))) else Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent)),
+                        )
+                        .then(if (sel) Modifier.border(1.dp, Color(0xFF9FC5FF), shape) else Modifier)
+                        .clickable { onSelect(t) }
+                        .padding(vertical = 7.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    val tint = if (sel) Color.White else Ind.onBgDim
+                    if (t == Tab.PENDING && pendingCount > 0) {
+                        BadgedBox(badge = { Badge(containerColor = Ind.red, contentColor = Color.White) { Text(pendingCount.toString()) } }) {
+                            Icon(painterResource(icon), contentDescription = t.label, tint = tint, modifier = Modifier.size(26.dp))
+                        }
+                    } else {
+                        Icon(painterResource(icon), contentDescription = t.label, tint = tint, modifier = Modifier.size(26.dp))
+                    }
+                    Text(t.label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = tint, maxLines = 1)
                 }
             }
         }

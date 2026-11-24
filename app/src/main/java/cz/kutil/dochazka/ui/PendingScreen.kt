@@ -40,8 +40,8 @@ import cz.kutil.dochazka.track.Notifier
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
-val OkGreen = Color(0xFF6EE27F)
-val WarnOrange = Color(0xFFF5B841)
+val OkGreen = Color(0xFF2E9A35)
+val WarnOrange = Color(0xFFE08600)
 
 fun eventTypeText(p: PendingEventEntity): String = when {
     p.type == "END" -> "Návrat domů"
@@ -112,7 +112,7 @@ fun PendingScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> U
             Text("Nic nečeká. Když opustíš domácí zónu nebo se vrátíš, objeví se tu dotaz – i kdybys oznámení přehlédl nebo telefon restartoval.")
         }
         for (p in open) {
-            Card(Modifier.fillMaxWidth()) {
+            SteelCard(padding = 0.dp) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(Notifier.title(p), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -156,7 +156,7 @@ fun PendingScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> U
         if (verifying.isNotEmpty()) {
             Text("Ověřuje se", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             for (p in verifying) {
-                Card(Modifier.fillMaxWidth()) {
+                SteelCard(padding = 0.dp) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("${eventTypeText(p)} · ${Fmt.dateTime(p.eventDetectedAt)}", fontWeight = FontWeight.Bold)
                         Text("Zdroj: ${sourceText(p)}")

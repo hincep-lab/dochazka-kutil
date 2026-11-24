@@ -1,6 +1,11 @@
 package cz.kutil.dochazka.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.res.painterResource
+import cz.kutil.dochazka.R
+import cz.kutil.dochazka.data.AutoBackup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,15 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -106,12 +102,15 @@ fun HomeScreen(
     }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         // --- záhlaví s logem ----------------------------------------------------------------
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Build, contentDescription = null, tint = Ind.orange, modifier = Modifier.size(34.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+            Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+                Icon(painterResource(R.drawable.ic_handyman), null, tint = Color.White, modifier = Modifier.size(50.dp))
+                Icon(painterResource(R.drawable.ic_build), null, tint = Ind.orange, modifier = Modifier.size(22.dp).align(Alignment.BottomEnd))
+            }
             Spacer(Modifier.size(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -119,114 +118,152 @@ fun HomeScreen(
                         append("Docházka ")
                         withStyle(SpanStyle(color = Ind.orange)) { append("Kutil") }
                     },
-                    fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, fontStyle = FontStyle.Italic, color = Ind.text,
+                    fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, fontStyle = FontStyle.Italic, color = Ind.onBg,
+                    style = PanelText,
                 )
-                Text(
-                    "${Fmt.dowLong(today).replaceFirstChar { it.uppercase() }} ${Fmt.date(today)} · ${state.settings.organization}",
-                    fontSize = 12.sp, color = Ind.textDim, maxLines = 1,
-                )
+                Text(state.settings.organization, fontSize = 14.sp, color = Ind.onBgDim, maxLines = 1, style = PanelText)
             }
             IconButton(onClick = { onOpenTab(Tab.SETTINGS) }) {
-                Icon(Icons.Filled.Settings, contentDescription = "Nastavení", tint = Ind.text)
+                Icon(painterResource(R.drawable.ic_settings), contentDescription = "Nastavení", tint = Ind.onBg, modifier = Modifier.size(30.dp))
             }
         }
         if (state.demo) {
             Text("Demo režim – ukázková data. Vypneš ho v Nastavení.", color = Ind.amber, fontSize = 13.sp)
         }
 
-        // --- stavový panel ------------------------------------------------------------------
+        // --- stavový panel v trubkovém rámu ---------------------------------------------------
         when {
             open != null -> {
                 val reportStart = open.editedStart ?: Rounding.roundToHalfHour(Instant.ofEpochMilli(open.rawStart)).toEpochMilli()
                 StatusPanel(PanelTone.WORKING) {
-                    Text("PRÁVĚ PRACUJEŠ", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, letterSpacing = 0.5.sp)
-                    Row(Modifier.fillMaxWidth()) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Začátek směny", fontSize = 13.sp, color = Color(0xFFE3F5E5))
-                            Text(Fmt.time(reportStart), fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("zaznamenáno ${Fmt.time(open.rawStart)}", fontSize = 12.sp, color = Color(0xFFD2EED6))
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text("Odpracováno", fontSize = 13.sp, color = Color(0xFFE3F5E5))
-                            Text(formatDuration(now - reportStart), fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("od začátku směny", fontSize = 12.sp, color = Color(0xFFD2EED6))
-                        }
+                    PanelHeadline(R.drawable.ic_engineering, "PRÁVĚ PRACUJEŠ", drop = true)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(painterResource(R.drawable.ic_schedule), null, tint = Color.White, modifier = Modifier.size(34.dp))
+                        Spacer(Modifier.size(10.dp))
+                        PanelValue("Začátek směny", Fmt.time(reportStart), Modifier.weight(0.9f))
+                        Box(Modifier.padding(horizontal = 8.dp).size(1.5.dp, 52.dp).background(Color.White.copy(alpha = 0.6f)))
+                        PanelValue("Odpracováno", formatHoursMinutes(now - reportStart), Modifier.weight(1.3f))
                     }
+                    Text(
+                        "Zaznamenán odchod v ${Fmt.time(open.rawStart)} · do výkazu ${Fmt.time(reportStart)}",
+                        fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f), style = PanelText,
+                    )
                 }
             }
             pending.isNotEmpty() -> {
                 val p = pending.first()
                 StatusPanel(PanelTone.PENDING) {
-                    Text("ČEKÁ NA POTVRZENÍ", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                    Text(Notifier.title(p), fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text(Notifier.detail(p), fontSize = 14.sp, color = Color(0xFFFFF1D6))
+                    PanelHeadline(R.drawable.ic_notifications_active, "ČEKÁ NA POTVRZENÍ", drop = false)
+                    Text(Notifier.title(p), fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, style = PanelText)
+                    Text(Notifier.detail(p), fontSize = 15.sp, color = Color.White, style = PanelText)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         BigActionButton("ANO", ActionKind.GO, Modifier.weight(1f), height = 52.dp) { vm.answer(p.id, true) }
-                        BigActionButton("NE", ActionKind.METAL, Modifier.weight(1f), height = 52.dp) { vm.answer(p.id, false) }
+                        BigActionButton("NE", ActionKind.STOP, Modifier.weight(1f), height = 52.dp) { vm.answer(p.id, false) }
                     }
                     if (pending.size > 1) {
-                        TextButton(onClick = { onOpenTab(Tab.PENDING) }) { Text("Další události: ${pending.size - 1}", color = Color.White) }
+                        TextButton(onClick = { onOpenTab(Tab.PENDING) }) { Text("Další události: ${pending.size - 1}", color = Color.White, fontWeight = FontWeight.Bold) }
                     }
                 }
             }
             else -> {
                 val away = state.settings.trackState == "AWAY" || state.settings.trackState == "OUTSIDE_PENDING"
                 StatusPanel(PanelTone.IDLE) {
-                    Text(if (away) "MIMO DOMOV" else "DOMA", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                    Row(Modifier.fillMaxWidth()) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Dnes odpracováno", fontSize = 13.sp, color = Ind.textDim)
-                            Text(WorkCalc.formatHm(day.minutes), fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text("Poslední konec", fontSize = 13.sp, color = Ind.textDim)
-                            Text(day.pieces.lastOrNull()?.endText() ?: "–", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
+                    PanelHeadline(if (away) R.drawable.ic_location_on else R.drawable.ic_home, if (away) "MIMO DOMOV" else "DOMA", drop = true)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(painterResource(R.drawable.ic_schedule), null, tint = Color.White, modifier = Modifier.size(34.dp))
+                        Spacer(Modifier.size(10.dp))
+                        PanelValue("Dnes odpracováno", hm(day.minutes), Modifier.weight(1.3f))
+                        Box(Modifier.padding(horizontal = 8.dp).size(1.5.dp, 52.dp).background(Color.White.copy(alpha = 0.6f)))
+                        PanelValue("Poslední konec", day.pieces.lastOrNull()?.endText() ?: "–", Modifier.weight(0.9f))
                     }
                 }
             }
         }
 
-        // --- hlavní ovládání -----------------------------------------------------------------
-        if (open != null) {
-            BigActionButton("Ukončit práci", ActionKind.STOP, Modifier.fillMaxWidth(), leading = { StopGlyph() }, onClick = onEndWork)
-        } else {
-            BigActionButton("Začít práci", ActionKind.GO, Modifier.fillMaxWidth(), leading = { PlayGlyph() }) { vm.startWork() }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            BigActionButton("Upravit čas", ActionKind.METAL, Modifier.weight(1f), icon = Icons.Filled.Edit, height = 52.dp) { onOpenDay(today) }
-            BigActionButton("Přidat výjezd", ActionKind.ACCENT, Modifier.weight(1f), icon = Icons.Filled.Add, height = 52.dp) { addDialog = true }
+        // --- dnešek a hlavní ovládání ---------------------------------------------------------
+        SteelCard(padding = 14.dp) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(painterResource(R.drawable.ic_calendar_month), null, tint = Ind.textDim, modifier = Modifier.size(26.dp))
+                Spacer(Modifier.size(10.dp))
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(fontWeight = FontWeight.ExtraBold)) { append("Dnes: ") }
+                        append("${Fmt.dowLong(today)} ${today.dayOfMonth}. ${Fmt.monthGenitive(today)}")
+                    },
+                    fontSize = 17.sp, color = Ind.text,
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(painterResource(R.drawable.ic_location_on), null, tint = Ind.textDim, modifier = Modifier.size(26.dp))
+                Spacer(Modifier.size(10.dp))
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(fontWeight = FontWeight.ExtraBold)) { append("Stav: ") }
+                        append(placeText(state))
+                    },
+                    fontSize = 17.sp, color = Ind.text, modifier = Modifier.weight(1f), maxLines = 1,
+                )
+                val on = state.settings.trackingEnabled && !state.demo
+                Icon(painterResource(R.drawable.ic_wifi), "Wi-Fi", tint = if (on) Ind.green else Ind.textMuted, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.size(6.dp))
+                Icon(painterResource(R.drawable.ic_gps_fixed), "GPS", tint = if (on) Ind.green else Ind.textMuted, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.size(2.dp))
+            if (open != null) {
+                BigActionButton("Ukončit práci", ActionKind.STOP, Modifier.fillMaxWidth(), leading = { StopGlyph() }, onClick = onEndWork)
+            } else {
+                BigActionButton("Začít práci", ActionKind.GO, Modifier.fillMaxWidth(), leading = { PlayGlyph() }) { vm.startWork() }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                BigActionButton("Upravit čas", ActionKind.METAL, Modifier.weight(1f), iconRes = R.drawable.ic_edit, height = 54.dp) { onOpenDay(today) }
+                BigActionButton("Výjezd", ActionKind.METAL, Modifier.weight(1f), iconRes = R.drawable.ic_local_shipping, height = 54.dp) { addDialog = true }
+            }
         }
 
         // --- upozornění ----------------------------------------------------------------------
         if (anomalies.isNotEmpty() && !state.demo) {
-            MetalCard {
-                SectionTitle("Ke kontrole", Icons.Filled.Warning)
+            SteelCard {
+                SectionTitle("Ke kontrole", iconRes = R.drawable.ic_warning)
                 for (a in anomalies.take(4)) AnomalyRow(a, open?.id, vm, onOpenDay, onEndWork) { ackTick++ }
             }
         }
 
         // --- dnešní intervaly ------------------------------------------------------------------
-        MetalCard(Modifier.clip(RoundedCornerShape(22.dp)).clickable { onOpenDay(today) }) {
-            SectionTitle("Dnešní práce", Icons.Filled.DateRange) {
-                Text("${WorkCalc.formatHm(day.minutes)} h", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ind.text)
+        val runningToday = open != null && Fmt.zoned(open.rawStart).toLocalDate() == today
+        if (day.pieces.isNotEmpty() || runningToday || day.override != null || day.holidayName != null) {
+            SteelCard(onClick = { onOpenDay(today) }) {
+                SectionTitle("Dnešní práce", iconRes = R.drawable.ic_assignment) {
+                    Text(hm(day.minutes), fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = Ind.text)
+                }
+                day.holidayName?.let { Text("Státní svátek: $it", color = Ind.amberText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                day.override?.let { Text(it.label, color = Ind.blue, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                for (piece in day.pieces) {
+                    IntervalRow("${piece.startText()} – ${piece.endText()}", hm(piece.minutes), running = false)
+                }
+                if (open != null && runningToday) {
+                    val s = open.editedStart ?: Rounding.roundToHalfHour(Instant.ofEpochMilli(open.rawStart)).toEpochMilli()
+                    IntervalRow("${Fmt.time(s)} – běží", formatHoursMinutes(now - s), running = true)
+                }
+                if (day.workLabels.isNotEmpty()) Text(day.workLabels.joinToString(" · "), color = Ind.amberText, fontSize = 13.sp)
             }
-            day.holidayName?.let { Text("Státní svátek: $it", color = Ind.amber, fontSize = 13.sp) }
-            day.override?.let { Text(it.label, color = Ind.blue, fontSize = 13.sp) }
-            if (day.pieces.isEmpty() && open == null) {
-                Text("Zatím žádný pracovní interval.", color = Ind.textDim, fontSize = 14.sp)
-            }
-            for (piece in day.pieces) {
-                IntervalRow("${piece.startText()} – ${piece.endText()}", WorkCalc.formatHm(piece.minutes) + " h", running = false)
-            }
-            if (open != null && Fmt.zoned(open.rawStart).toLocalDate() == today) {
-                val s = open.editedStart ?: Rounding.roundToHalfHour(Instant.ofEpochMilli(open.rawStart)).toEpochMilli()
-                IntervalRow("${Fmt.time(s)} – běží", formatDuration(now - s).substringBeforeLast(':') + " h", running = true)
-            }
-            if (day.workLabels.isNotEmpty()) Text(day.workLabels.joinToString(" · "), color = Ind.amber, fontSize = 13.sp)
         }
 
-        HtPipeDivider()
+        // --- rychlé akce ----------------------------------------------------------------------
+        SteelCard(screws = true, padding = 14.dp) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(painterResource(R.drawable.ic_handyman), null, tint = Ind.orangeDeep, modifier = Modifier.size(26.dp))
+                Spacer(Modifier.size(8.dp))
+                Text("Rychlé akce", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Ind.text)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuickTile("Záznam dne", R.drawable.ic_edit_note, Ind.orangeDeep, Modifier.weight(1f)) { onOpenDay(today) }
+                QuickTile("Výkaz\n(Word)", R.drawable.ic_description, Color(0xFF1F5FCC), Modifier.weight(1f)) { onOpenTab(Tab.MONTH) }
+                QuickTile("Záloha\ndat", R.drawable.ic_backup, Color(0xFF2A4C76), Modifier.weight(1f)) {
+                    if (AutoBackup.folder(context) != null) vm.runAutoBackupNow() else onOpenTab(Tab.SETTINGS)
+                }
+                QuickTile("Nastavení", R.drawable.ic_settings, Color(0xFF55657A), Modifier.weight(1f)) { onOpenTab(Tab.SETTINGS) }
+            }
+        }
 
         // --- stav sledování ----------------------------------------------------------------------
         if (!state.demo) {
@@ -240,22 +277,22 @@ fun HomeScreen(
             val lastExit = remember(state.settings.lastDiagnosticAt) { AppPrefs.lastExitAt(context) }
             val lastEnter = remember(state.settings.lastDiagnosticAt) { AppPrefs.lastEnterAt(context) }
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onOpenDiag).padding(vertical = 8.dp, horizontal = 4.dp),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0x66081426)).clickable(onClick = onOpenDiag).padding(vertical = 10.dp, horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 StatusDot(dot)
                 Spacer(Modifier.size(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Ind.text)
+                    Text(text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Ind.onBg)
                     Text(
                         "Odchod ${if (lastExit > 0) Fmt.dateTime(lastExit) else "–"} · návrat ${if (lastEnter > 0) Fmt.dateTime(lastEnter) else "–"}",
-                        fontSize = 12.sp, color = Ind.textDim,
+                        fontSize = 12.sp, color = Ind.onBgDim,
                     )
                 }
-                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Stav sledování", tint = Ind.textDim)
+                Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = "Stav sledování", tint = Ind.onBgDim)
             }
         }
-        Spacer(Modifier.height(8.dp))
+        DrainFooter()
     }
 
     if (addDialog) {
@@ -274,13 +311,41 @@ fun HomeScreen(
     }
 }
 
+private fun hm(minutes: Int): String = "${minutes / 60} h ${"%02d".format(minutes % 60)} min"
+
+private fun placeText(state: UiState): String = when {
+    state.demo -> "ukázková data"
+    state.openShift != null -> if (state.settings.trackState == "RETURN_PENDING") "zpět doma" else "v práci / u zákazníka"
+    !state.settings.trackingEnabled -> "ruční režim"
+    state.settings.trackState == "AWAY" || state.settings.trackState == "OUTSIDE_PENDING" -> "mimo domov"
+    else -> "doma"
+}
+
+@Composable
+private fun PanelHeadline(icon: Int, text: String, drop: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(painterResource(icon), null, tint = Color.White, modifier = Modifier.size(42.dp))
+        Spacer(Modifier.size(12.dp))
+        Text(text, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, style = PanelText, modifier = Modifier.weight(1f), maxLines = 1)
+        if (drop) Icon(painterResource(R.drawable.ic_water_drop), null, tint = Color(0xFF8FD3FF), modifier = Modifier.size(34.dp))
+    }
+}
+
+@Composable
+private fun PanelValue(label: String, value: String, modifier: Modifier) {
+    Column(modifier) {
+        Text(label, fontSize = 14.sp, color = Color.White.copy(alpha = 0.92f), style = PanelText, maxLines = 1)
+        Text(value, fontSize = 30.sp, lineHeight = 34.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, style = PanelText, maxLines = 1)
+    }
+}
+
 @Composable
 private fun IntervalRow(times: String, duration: String, running: Boolean) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        StatusDot(if (running) Ind.greenLight else Ind.green, size = 9.dp)
+        StatusDot(Ind.green, size = 11.dp)
         Spacer(Modifier.size(10.dp))
         Text(times, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ind.text, modifier = Modifier.weight(1f))
-        Text(duration, fontSize = 15.sp, color = if (running) Ind.greenLight else Ind.textDim, fontWeight = FontWeight.SemiBold)
+        Text(duration, fontSize = 15.sp, color = if (running) Ind.greenDeep else Ind.textDim, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -295,7 +360,7 @@ private fun AnomalyRow(
 ) {
     val color = when (a.kind) {
         AnomalyKind.FORGOTTEN_END, AnomalyKind.OVERLAP -> Ind.red
-        else -> Ind.amber
+        else -> Ind.orange
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -306,7 +371,7 @@ private fun AnomalyRow(
         Text(a.detail, fontSize = 13.sp, color = Ind.textDim, modifier = Modifier.padding(start = 20.dp))
         Row(Modifier.padding(start = 10.dp)) {
             if (a.kind == AnomalyKind.FORGOTTEN_END && openShiftId != null) {
-                TextButton(onClick = onEndWork) { Text("Ukončit práci", color = Ind.orange) }
+                TextButton(onClick = onEndWork) { Text("Ukončit práci", color = Ind.redDeep, fontWeight = FontWeight.Bold) }
                 TextButton(onClick = {
                     vm.stillWorking(openShiftId)
                     onAck()
@@ -314,8 +379,8 @@ private fun AnomalyRow(
             } else if (a.date != null) {
                 val d = a.date
                 TextButton(onClick = { onOpenDay(d) }) {
-                    Icon(Icons.Filled.LocationOn, contentDescription = null, tint = Ind.orange, modifier = Modifier.size(16.dp))
-                    Text(" Otevřít den", color = Ind.orange)
+                    Icon(painterResource(R.drawable.ic_calendar_month), contentDescription = null, tint = Ind.blue, modifier = Modifier.size(16.dp))
+                    Text(" Otevřít den", color = Ind.blue, fontWeight = FontWeight.Bold)
                 }
             }
         }

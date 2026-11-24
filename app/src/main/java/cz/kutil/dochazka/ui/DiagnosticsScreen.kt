@@ -45,7 +45,7 @@ private fun levelColor(level: Level): Color = when (level) {
 
 @Composable
 private fun StatusRow(level: Level, title: String, detail: String, action: String? = null, onAction: (() -> Unit)? = null) {
-    Card(Modifier.fillMaxWidth()) {
+    SteelCard(padding = 0.dp) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.padding(top = 4.dp).size(16.dp).clip(CircleShape).background(levelColor(level)))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -95,7 +95,7 @@ fun DiagnosticsScreen(vm: MainViewModel, state: UiState) {
             },
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = if (!tracking) MaterialTheme.colorScheme.outline else if (allOk) OkGreen else MaterialTheme.colorScheme.error,
+            color = if (!tracking) MaterialTheme.colorScheme.outline else if (allOk) Ind.greenLight else MaterialTheme.colorScheme.error,
         )
 
         Text("Oprávnění a systém", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

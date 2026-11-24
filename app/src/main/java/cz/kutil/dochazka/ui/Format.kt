@@ -20,6 +20,13 @@ object Fmt {
         "Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec",
     )
 
+    private val GENITIVE = listOf(
+        "ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince",
+    )
+
+    /** "listopadu" – pro „úterý 24. listopadu“. */
+    fun monthGenitive(d: LocalDate): String = GENITIVE[d.monthValue - 1]
+
     fun zoned(ms: Long): ZonedDateTime = Instant.ofEpochMilli(ms).atZone(PRAGUE)
     fun time(ms: Long): String = zoned(ms).let { "%02d:%02d".format(it.hour, it.minute) }
     fun time(i: Instant): String = time(i.toEpochMilli())
