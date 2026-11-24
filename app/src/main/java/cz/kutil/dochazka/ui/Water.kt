@@ -332,7 +332,7 @@ fun Faucet(water: WaterState, modifier: Modifier = Modifier) {
             valve, contentDescription = null,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .offset(x = 150.dp - FaucetNozzleFromEnd - 14.dp + 12.dp, y = (-25).dp)
+                .offset(x = 150.dp - FaucetNozzleFromEnd - 14.dp + 12.dp, y = (-22).dp)
                 .size(58.dp, 46.dp)
                 .graphicsLayer { scaleX = turn },
         )
