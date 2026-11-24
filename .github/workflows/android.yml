@@ -29,6 +29,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Robolectric si stahuje obraz Androidu z Maven Central; v mezipaměti, aby nás nebrzdil limit 429
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-4.14.1-sdk34
+
       - name: Unit testy
         run: ./gradlew testDebugUnitTest --stacktrace
 
