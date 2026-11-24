@@ -131,6 +131,9 @@ fun rememberWaterState(working: Boolean, animate: Boolean): WaterState {
 
 enum class GlassTone { WORKING, PENDING, IDLE }
 
+/** Volné místo pod textem panelu, ve kterém se drží vodní hladina. */
+val WaterZone: Dp = 46.dp
+
 /** Kde je ústí kohoutku vůči pravému okraji panelu. */
 val FaucetNozzleFromEnd: Dp = 58.dp
 private const val DRIP_PERIOD = 3.4f
@@ -166,21 +169,22 @@ fun WaterPanel(
             // skleněný lesk nahoře
             Box(Modifier.fillMaxWidth().height(36.dp).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.16f), Color.Transparent))))
             CompositionLocalProvider(LocalContentColor provides Color.White) {
-                Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 30.dp), content = content)
+                Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = WaterZone), content = content)
             }
         }
-        Faucet(water, Modifier.align(Alignment.TopEnd).offset(x = 12.dp + 2.dp, y = (-58).dp))
+        Faucet(water, Modifier.align(Alignment.TopEnd).offset(x = 12.dp + 2.dp, y = (-48).dp))
     }
 }
 
 private fun DrawScope.drawWater(t: Float, w: WaterState, level: Float, animate: Boolean, tone: GlassTone) {
     val wv = size.width
     val h = size.height
-    // Hladina: klid 14 % výšky, plná osmihodinová směna 46 % (text zůstává nad vodou).
-    val fill = 0.14f + 0.32f * min(level, 1f)
-    val surface = h * (1f - fill)
+    // Hladina se drží v pásu pod textem (obsah panelu má dole volné místo WaterZone):
+    // prázdná 10 dp, plná osmihodinová směna 40 dp. Přesčas = jasnější podsvícení.
+    val fillPx = (10f + 30f * min(level, 1f)) * density
+    val surface = h - fillPx
     val overtime = (level - 1f).coerceIn(0f, 0.5f) * 2f
-    val amp = (2.0f + 3.5f * w.flow) * density
+    val amp = (1.5f + 2.5f * w.flow) * density
     val phase = if (animate) t else 0f
     val base = if (tone == GlassTone.PENDING) Color(0xFFFFB648) else Color(0xFF39A7FF)
     val glow = 0.30f + 0.25f * overtime
@@ -297,7 +301,7 @@ fun DrawScope.drawDrop(c: Offset, r: Float, stretch: Float) {
 fun Faucet(water: WaterState, modifier: Modifier = Modifier) {
     val pipes = rememberPipeImages()
     val valve = painterResource(R.drawable.pipe_valve)
-    Box(modifier.size(150.dp, 64.dp)) {
+    Box(modifier.size(150.dp, 54.dp)) {
         Canvas(Modifier.fillMaxSize()) {
             val d = 16.dp.toPx()
             val k = d / 64f

@@ -143,7 +143,7 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // --- záhlaví s logem (vpravo je místo pro kohoutek) ---------------------------------------
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, start = 8.dp).height(56.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 10.dp, start = 8.dp).height(62.dp)) {
             Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
                 Icon(painterResource(R.drawable.ic_handyman), null, tint = Color.White, modifier = Modifier.size(34.dp))
                 Icon(painterResource(R.drawable.ic_water_drop), null, tint = Color(0xFF5CC2FF), modifier = Modifier.size(18.dp).align(Alignment.BottomEnd))
