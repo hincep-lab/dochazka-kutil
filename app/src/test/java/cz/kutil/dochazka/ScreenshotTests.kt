@@ -260,7 +260,8 @@ class ScreenshotTests {
     @Config(qualifiers = "w412dp-h915dp-xxhdpi")
     fun widgetWater() {
         val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
-        val now = System.currentTimeMillis()
+        // poledne, aby byla vidět denní (animovaná) podoba
+        val now = LocalDate.now(PRAGUE).atTime(12, 30).atZone(PRAGUE).toInstant().toEpochMilli()
         val col = android.widget.LinearLayout(activity).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             setBackgroundColor(0xFF2B3A4E.toInt())

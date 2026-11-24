@@ -61,6 +61,26 @@ class DochazkaWidget : AppWidgetProvider() {
             val views = build(app, s)
             manager.updateAppWidget(ids, views)
             scheduleLevelRefresh(app, s.working)
+            scheduleDaypart(app)
+        }
+
+        /** Noc 20:00–6:00: widget se zklidní (nehybná voda), ať zbytečně nekreslí. */
+        internal fun isNight(nowMs: Long): Boolean {
+            val h = java.time.Instant.ofEpochMilli(nowMs).atZone(cz.kutil.dochazka.core.PRAGUE).hour
+            return h >= 20 || h < 6
+        }
+
+        /** Obnoví widget přesně ve 20:00 a v 6:00 (přepnutí noc / den). */
+        private fun scheduleDaypart(ctx: Context) {
+            val now = java.time.ZonedDateTime.now(cz.kutil.dochazka.core.PRAGUE)
+            val today20 = now.toLocalDate().atTime(20, 0).atZone(cz.kutil.dochazka.core.PRAGUE)
+            val next6 = now.toLocalDate().let { if (now.hour < 6) it else it.plusDays(1) }.atTime(6, 0).atZone(cz.kutil.dochazka.core.PRAGUE)
+            val next = if (now.isBefore(today20) && now.hour >= 6) today20 else next6
+            val delayMs = java.time.Duration.between(now, next).toMillis().coerceAtLeast(60_000L) + 30_000L
+            androidx.work.WorkManager.getInstance(ctx).enqueueUniqueWork(
+                "widget_daypart", androidx.work.ExistingWorkPolicy.REPLACE,
+                androidx.work.OneTimeWorkRequestBuilder<WidgetLevelWorker>().setInitialDelay(delayMs, java.util.concurrent.TimeUnit.MILLISECONDS).build(),
+            )
         }
 
         /** Sestaví vzhled widgetu (oddělené kvůli testu vzhledu). */
@@ -121,7 +141,7 @@ class DochazkaWidget : AppWidgetProvider() {
             val fill = level.coerceIn(0.12f, 1f)
             views.setFloat(R.id.w_level, "setWeightSum", 1f / fill)
             views.setInt(R.id.w_vessel, "setBackgroundResource", if (!working && s.pending > 0) R.drawable.widget_glass_pending else R.drawable.widget_glass)
-            val animate = animationsAllowed(app)
+            val animate = animationsAllowed(app) && !isNight(nowMs)
             fun show(id: Int, on: Boolean) = views.setViewVisibility(id, if (on) View.VISIBLE else View.GONE)
             show(R.id.w_wave, animate)
             show(R.id.w_wave_static, !animate)

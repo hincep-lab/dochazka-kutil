@@ -340,7 +340,10 @@ private fun DrawScope.actLadder(e: Float, t: Float, floorY: Float, u: Float, fad
     withAlpha(fade) {
         // svislá trubka se ventilem
         drawImage(pipes.v, srcOffset = androidx.compose.ui.unit.IntOffset.Zero, srcSize = androidx.compose.ui.unit.IntSize(pipes.v.width, pipes.v.height),
-            dstOffset = androidx.compose.ui.unit.IntOffset((px - d / 2).toInt(), 0), dstSize = androidx.compose.ui.unit.IntSize(d.toInt(), floorY.toInt()))
+            dstOffset = androidx.compose.ui.unit.IntOffset((px - d / 2).toInt(), (floorY - 172 * u).toInt()), dstSize = androidx.compose.ui.unit.IntSize(d.toInt(), (172 * u).toInt()))
+        // zátka na horním konci trubky
+        drawRoundRect(Color(0xFF241A14), Offset(px - d / 2 - 3 * u, floorY - 176 * u), Size(d + 6 * u, 9 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.5f * u))
+        drawRoundRect(Brush.horizontalGradient(listOf(Color(0xFF8C96A2), Color(0xFFE4E9EE), Color(0xFF6E7884)), startX = px - d / 2 - 2 * u, endX = px + d / 2 + 2 * u), Offset(px - d / 2 - 2 * u, floorY - 175 * u), Size(d + 4 * u, 7 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
         drawOval(Color(0xFF241A14), Offset(px - 19 * u, valveY - 6 * u), Size(38 * u, 12 * u), style = Stroke(5.5f * u))
         drawOval(Color(0xFFD63A2F), Offset(px - 19 * u, valveY - 6 * u), Size(38 * u, 12 * u), style = Stroke(3.5f * u))
         drawLine(Color(0xFFD63A2F), Offset(px - 17 * u, valveY), Offset(px + 17 * u, valveY), strokeWidth = 2.5f * u)

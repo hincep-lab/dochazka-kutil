@@ -28,6 +28,10 @@ object AppPrefs {
     fun decorAnimations(ctx: Context): Boolean = prefs(ctx).getBoolean("decor_animations", true)
     fun setDecorAnimations(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("decor_animations", on).apply()
 
+    /** Plynulost animací v aplikaci: 60 nebo 120 snímků za sekundu (120 = plná frekvence displeje). */
+    fun smoothFps(ctx: Context): Int = if (prefs(ctx).getInt("smooth_fps", 60) >= 120) 120 else 60
+    fun setSmoothFps(ctx: Context, fps: Int) = prefs(ctx).edit().putInt("smooth_fps", if (fps >= 120) 120 else 60).apply()
+
     /** Zvuky vody (kapka, přetékání). Hrají jen v aplikaci a ne v tichém režimu. */
     fun waterSounds(ctx: Context): Boolean = prefs(ctx).getBoolean("water_sounds", true)
     fun setWaterSounds(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("water_sounds", on).apply()

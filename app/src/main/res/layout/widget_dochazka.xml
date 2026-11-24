@@ -180,7 +180,7 @@
                     android:layout_height="wrap_content"
                     android:shadowColor="#CC000000"
                     android:shadowRadius="4"
-                    android:textColor="#8CF27A"
+                    android:textColor="#FFC857"
                     android:textSize="24sp"
                     android:textStyle="bold"
                     android:visibility="gone" />
@@ -213,7 +213,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:maxLines="1"
-        android:textColor="#F5B841"
+        android:textColor="#FFB070"
         android:textSize="13sp"
         android:textStyle="bold"
         android:visibility="gone" />

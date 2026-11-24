@@ -244,7 +244,7 @@ private fun poseTape(e: Float, t: Float, standX: Float, w: Float, u: Float): Pos
 internal fun DrawScope.actBucket(e: Float, t: Float, floorY: Float, u: Float, fade: Float, pipes: PipeImages, sm: PoseSmoother) {
     val w = size.width
     val d = 16 * u
-    val pipeY = floorY - 104 * u
+    val pipeY = floorY - 98 * u
     val lx = w * 0.58f
     val standX = lx - 34 * u
     val pose = poseBucket(e, t, standX, lx, w, u)
@@ -332,7 +332,7 @@ private fun poseBucket(e: Float, t: Float, standX: Float, lx: Float, w: Float, u
 internal fun DrawScope.actFlood(e: Float, t: Float, floorY: Float, u: Float, fade: Float, pipes: PipeImages, sm: PoseSmoother) {
     val w = size.width
     val d = 16 * u
-    val pipeY = floorY - 150 * u
+    val pipeY = floorY - 118 * u
     val outX = w * 0.16f
     val lev = 50 * u * ez(sg(e, 0.3f, 4f)) * (1f - ez(sg(e, 10.2f, 12.4f)))
     val surf = floorY - lev
@@ -400,7 +400,7 @@ private fun poseFlood(e: Float, t: Float, duckX: Float, duckY: Float, duckS: Flo
 internal fun DrawScope.actCoffee(e: Float, t: Float, floorY: Float, u: Float, fade: Float, pipes: PipeImages, sm: PoseSmoother) {
     val w = size.width
     val d = 16 * u
-    val pipeY = floorY - 122 * u
+    val pipeY = floorY - 108 * u
     val sx = w * 0.42f
     val boxH = 18 * u
     withAlpha(fade) {

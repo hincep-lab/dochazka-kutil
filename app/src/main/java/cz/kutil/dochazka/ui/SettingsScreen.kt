@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -128,10 +129,23 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
             }
             Text(
                 "Kapající kohoutek, nádoba plnící se k 8 hodinám, proudění v potrubí a vír u vpusti. Běží jen když je aplikace na obrazovce, " +
-                    "plynule s obnovovací frekvencí displeje (60 i více snímků za sekundu). Totéž ve widgetu na ploše (bez zvuku). Při vypnutí (nebo když má telefon zapnuté „Odebrat animace“) zůstane klidný statický vzhled. " +
+                    "60 nebo 120 snímků za sekundu podle volby níže. Ve widgetu na ploše voda teče také (bez zvuku), v noci od 20 do 6 hodin se zklidní. Při vypnutí (nebo když má telefon zapnuté „Odebrat animace“) zůstane klidný statický vzhled. " +
                     "Na docházku nemají animace žádný vliv.",
                 style = MaterialTheme.typography.bodySmall,
             )
+            var fps by remember { mutableStateOf(AppPrefs.smoothFps(context)) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Plynulost animací", Modifier.weight(1f))
+                for (v in listOf(60, 120)) {
+                    FilterChip(
+                        selected = fps == v,
+                        onClick = { fps = v; AppPrefs.setSmoothFps(context, v) },
+                        label = { Text("$v snímků/s") },
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+            }
+            Text("120 je plynulejší, ale víc vybíjí baterii. Platí jen v aplikaci, widget kreslí plocha telefonu sama.", style = MaterialTheme.typography.bodySmall)
             var sounds by remember { mutableStateOf(AppPrefs.waterSounds(context)) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Zvuky vody", Modifier.weight(1f))

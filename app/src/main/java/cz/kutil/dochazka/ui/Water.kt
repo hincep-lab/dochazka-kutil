@@ -100,27 +100,32 @@ object WaterClockDebug {
 }
 
 @Composable
-fun rememberWaterClock(enabled: Boolean): State<Float> {
+fun rememberWaterClock(enabled: Boolean, fps: Int = 60): State<Float> {
     WaterClockDebug.manual?.let { return it }
     val t = remember { mutableFloatStateOf(0f) }
     val owner = LocalLifecycleOwner.current
-    LaunchedEffect(enabled, owner) {
+    LaunchedEffect(enabled, owner, fps) {
         if (!enabled) return@LaunchedEffect
         owner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            // každý snímek displeje (60 Hz, na 120Hz displeji i 120 snímků za sekundu)
+            // 60: každý snímek na 60Hz displeji, na 120Hz každý druhý; 120: každý snímek displeje
+            val minGap = 1_000_000_000L / fps - 2_000_000L
             var last = -1L
             var acc = t.floatValue
             while (true) {
                 var gap = 16_000_000L
                 withFrameNanos { ns ->
-                    if (last >= 0) {
+                    if (last < 0) {
+                        last = ns
+                    } else if (ns - last >= minGap) {
                         gap = ns - last
                         acc += min(gap, 100_000_000L) / 1_000_000_000f
+                        last = ns
+                        t.floatValue = acc
+                    } else {
+                        gap = ns - last
                     }
-                    last = ns
-                    t.floatValue = acc
                 }
-                // pojistka: kdyby snímky chodily nepřirozeně rychle (testy, emulátor), nejvýš ~120 za sekundu
+                // pojistka: kdyby snímky chodily nepřirozeně rychle (testy, emulátor)
                 if (gap < 4_000_000L) delay(8)
             }
         }

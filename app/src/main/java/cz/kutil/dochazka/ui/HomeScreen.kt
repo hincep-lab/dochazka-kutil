@@ -126,7 +126,7 @@ fun HomeScreen(
 
     // --- živá voda: jeden společný takt, jen když je aplikace vidět a animace jsou povolené ----
     val animate = decorAnimationsEnabled(resumeTick)
-    val clock = rememberWaterClock(animate)
+    val clock = rememberWaterClock(animate, remember(resumeTick) { AppPrefs.smoothFps(context) })
     val water = rememberWaterState(open != null, animate)
     val dripSync = remember { DripSync() }
     val panelBounds = remember { PanelBounds() }
@@ -375,7 +375,8 @@ fun HomeScreen(
         }
         // vpusť na konci stránky (posouvá se s obsahem jako podlaha)
         DrainFloor(clock, overflowing = open != null && worked > 8 * 3_600_000L, animate = animate, bounds = drainBounds)
-        Spacer(Modifier.height(if (gagOn) 40.dp else 10.dp))
+        // na konci stránky je pod obsahem místo pro Kutilovo jeviště, aby jeho trubky nepřekrývaly karty
+        Spacer(Modifier.height(if (gagOn) StageHeight - 90.dp else 10.dp))
     }
     // v přesčasu stéká voda z nádoby přes celou obrazovku do vpusti
     OverflowOverlay(clock, overflowing = open != null && worked > 8 * 3_600_000L, animate = animate, panel = panelBounds, modifier = Modifier.fillMaxSize(), drainAt = drainBounds)
