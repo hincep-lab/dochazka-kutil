@@ -222,24 +222,49 @@ private fun DrawScope.drawWorkshop(e: Float, t: Float, water: WaterState, pipes:
 }
 
 private fun DrawScope.drawSpray(o: Offset, s: Float, t: Float, floorY: Float, u: Float) {
-    val n = (10 * s).toInt() + 4
-    for (i in 0 until n) {
-        val spread = (i.toFloat() / n - 0.5f)
-        val vx = (60f + 110f * s) * spread * u
-        val vy = (-20f - 40f * s * (0.5f - abs(spread))) * u
-        for (j in 0 until 6) {
-            val q = ((t * 1.6f + i * 0.137f + j / 6f) % 1f)
-            val tt = q * 0.9f
-            val x = o.x + vx * tt * 3f
-            val y = o.y + vy * tt * 3f + 0.5f * 600f * u * tt * tt
-            if (y > floorY) continue
-            val r = (1.4f + (1 - q) * 1.6f) * u
-            drawCircle(Color(0xCC8FD3FF), r, Offset(x, y))
-            drawCircle(Color.White.copy(alpha = 0.7f), r * 0.4f, Offset(x - r * 0.3f, y - r * 0.3f))
+    // soustředěný proud šikmo doleva dolů (tam, kde stojí Kutil) + pár odletujících kapek
+    val g = 900f * u
+    val jets = listOf(-1f to 1f, -0.82f to 0.75f, -1.18f to 0.55f)
+    for ((k, a) in jets) {
+        val vx = (95f + 55f * s) * u * k
+        val vy = (-15f + 10f * k) * u
+        val path = Path()
+        var started = false
+        var tt = 0f
+        var last = o
+        while (tt < 0.7f) {
+            val x = o.x + vx * tt
+            val y = o.y + vy * tt + 0.5f * g * tt * tt
+            if (y > floorY) break
+            if (!started) { path.moveTo(x, y); started = true } else path.lineTo(x, y)
+            last = Offset(x, y)
+            tt += 0.02f
+        }
+        drawPath(path, Color(0x6690D4FF).copy(alpha = 0.45f * a), style = Stroke((3f + 3f * s) * u * a, cap = StrokeCap.Round))
+        drawPath(path, Color.White.copy(alpha = 0.55f * a), style = Stroke(1.2f * u, cap = StrokeCap.Round))
+        // kapky letící po proudu
+        for (j in 0 until 5) {
+            val q = ((t * 2.2f + j / 5f + k) % 1f) * 0.7f
+            val x = o.x + vx * q + (j % 2 - 0.5f) * 3 * u
+            val y = o.y + vy * q + 0.5f * g * q * q
+            if (y < floorY) drawDrop(Offset(x, y), (1.6f + s) * u, 1f)
+        }
+        // cákání na podlaze
+        if (last.y > floorY - 4 * u) {
+            for (j in 0 until 3) {
+                val q = ((t * 3f + j / 3f) % 1f)
+                drawCircle(Color(0xAA9ED8FF), 1.3f * u, Offset(last.x + (j - 1) * 6 * u * q, floorY - 10 * u * q * (1 - q) * 2))
+            }
         }
     }
-    // mlha
-    drawCircle(Brush.radialGradient(listOf(Color(0x5596D6FF), Color.Transparent), center = o, radius = 26 * u * s), 26 * u * s, o)
+    // pár kapek odletujících na druhou stranu
+    for (j in 0 until (3 * s).toInt() + 1) {
+        val q = ((t * 1.7f + j * 0.29f) % 1f) * 0.5f
+        val x = o.x + 60f * u * q
+        val y = o.y - 25f * u * q + 0.5f * g * q * q
+        if (y < floorY) drawCircle(Color(0xCC8FD3FF), 1.5f * u, Offset(x, y))
+    }
+    drawCircle(Brush.radialGradient(listOf(Color(0x5596D6FF), Color.Transparent), center = o, radius = 18 * u * s), 18 * u * s, o)
 }
 
 // ---------------------------------------------------------------------------------------------
