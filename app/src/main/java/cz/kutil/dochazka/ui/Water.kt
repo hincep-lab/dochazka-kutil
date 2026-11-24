@@ -11,6 +11,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -28,6 +31,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -556,6 +560,81 @@ fun GlassCard(modifier: Modifier = Modifier, padding: Dp = 12.dp, onClick: (() -
         CompositionLocalProvider(LocalContentColor provides Color.White) {
             Column(Modifier.padding(padding), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(7.dp), content = content)
         }
+    }
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// Přetékání přes celou obrazovku: z nádoby stékají pramínky až dolů do vpusti
+// ---------------------------------------------------------------------------------------------
+
+/** Kde je na obrazovce panel s nádobou (v souřadnicích kořene). */
+class PanelBounds { var rect by androidx.compose.runtime.mutableStateOf<Rect?>(null) }
+
+@Composable
+fun OverflowOverlay(clock: State<Float>, overflowing: Boolean, animate: Boolean, panel: PanelBounds, modifier: Modifier = Modifier) {
+    val k by animateFloatAsState(if (overflowing) 1f else 0f, tween(if (animate) 2200 else 0), label = "overflow")
+    if (k <= 0.01f) return
+    val grate = ImageBitmap.imageResource(R.drawable.drain_persp)
+    var origin by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Offset.Zero) }
+    Canvas(
+        modifier.onGloballyPositioned { origin = it.positionInRoot() },
+    ) {
+        val t = if (animate) clock.value else 0f
+        val u = density
+        val r = panel.rect?.let { Rect(it.left - origin.x, it.top - origin.y, it.right - origin.x, it.bottom - origin.y) }
+            ?: Rect(0f, 0f, size.width, size.height * 0.3f)
+        val drain = Offset(size.width / 2, size.height - 22 * u)
+        val startY = r.bottom.coerceIn(0f, size.height * 0.8f)
+        val water = Color(0xFF6CC4FF)
+        // pramínky: od rohů nádoby dolů a pak do vpusti
+        for ((i, x0) in listOf(r.left + 6 * u, r.right - 6 * u, r.left + r.width * 0.33f).withIndex()) {
+            if (i == 2 && k < 0.6f) continue
+            val bottom = size.height - 46 * u - i * 6 * u
+            val path = Path().apply {
+                moveTo(x0, startY)
+                // lehké vlnění pramínku
+                var y = startY
+                while (y < bottom) {
+                    y += 24 * u
+                    lineTo(x0 + 2.2f * u * sin(y / (31 * u) + t * 2.5f + i), min(y, bottom))
+                }
+                quadraticTo(x0, drain.y - 4 * u, (x0 + drain.x) / 2, drain.y - 2 * u)
+                quadraticTo(drain.x + (x0 - drain.x) * 0.15f, drain.y, drain.x, drain.y)
+            }
+            val wdt = (if (i == 2) 3.5f else 5f) * u * k
+            drawPath(path, water.copy(alpha = 0.40f * k), style = Stroke(wdt * 1.8f, cap = StrokeCap.Round))
+            drawPath(path, water.copy(alpha = 0.75f * k), style = Stroke(wdt, cap = StrokeCap.Round))
+            // proudění: bílé odlesky běží po pramínku dolů
+            drawPath(
+                path, Color.White.copy(alpha = 0.75f * k),
+                style = Stroke(
+                    1.4f * u, cap = StrokeCap.Round,
+                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10 * u, 26 * u), -(t * 90f * u) % (36 * u)),
+                ),
+            )
+            // kapky, které odskakují
+            val q = ((t * 0.8f + i * 0.37f) % 1f)
+            drawDrop(Offset(x0 + (if (i == 1) -1 else 1) * 6 * u * q, startY + (bottom - startY) * q), 2f * u * k, 1.2f)
+        }
+        // louže a vír u vpusti dole
+        drawOval(
+            Brush.radialGradient(listOf(Color(0x9954B6FF), Color(0x3340A0FF), Color.Transparent), center = drain, radius = 90 * u * k),
+            Offset(drain.x - 90 * u * k, drain.y - 18 * u * k), Size(180 * u * k, 36 * u * k),
+        )
+        for (j in 0 until 4) {
+            val rw = (26f + j * 12f) * u
+            rotate(t * (160f - j * 25f) + j * 80f, drain) {
+                drawArc(Color.White.copy(alpha = (0.55f - j * 0.1f) * k), 0f, 100f, false, Offset(drain.x - rw, drain.y - rw * 0.35f), Size(rw * 2, rw * 0.7f), style = Stroke(1.6f * u))
+            }
+        }
+        val gw = 70 * u
+        val gh = gw * grate.height / grate.width
+        drawImage(
+            grate, srcOffset = androidx.compose.ui.unit.IntOffset.Zero, srcSize = androidx.compose.ui.unit.IntSize(grate.width, grate.height),
+            dstOffset = androidx.compose.ui.unit.IntOffset((drain.x - gw / 2).toInt(), (drain.y - gh / 2).toInt()),
+            dstSize = androidx.compose.ui.unit.IntSize(gw.toInt(), gh.toInt()), alpha = k,
+        )
     }
 }
 

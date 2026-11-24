@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -127,6 +129,7 @@ fun HomeScreen(
     val clock = rememberWaterClock(animate)
     val water = rememberWaterState(open != null, animate)
     val dripSync = remember { DripSync() }
+    val panelBounds = remember { PanelBounds() }
     val soundsOn = animate && remember(resumeTick) { soundsEnabled(context) }
     val sounds = rememberWaterSounds(soundsOn)
     val gagOn = animate && remember(resumeTick) { AppPrefs.plumberGag(context) }
@@ -175,7 +178,10 @@ fun HomeScreen(
                 val startDay = Fmt.zoned(open.rawStart).toLocalDate()
                 val over = worked > 8 * 3_600_000L
                 WaterSoundEffects(sounds, clock, dripSync, dripping = water.flow > 0.85f, overflowing = over)
-                WaterPanel(GlassTone.WORKING, clock, water, worked / (8f * 3_600_000f), animate, drip = dripSync) {
+                WaterPanel(
+                    GlassTone.WORKING, clock, water, worked / (8f * 3_600_000f), animate, drip = dripSync,
+                    modifier = Modifier.onGloballyPositioned { panelBounds.rect = it.boundsInRoot() },
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(R.drawable.ic_engineering), null, tint = Color.White, modifier = Modifier.size(if (big) 26.dp else 32.dp))
                         Spacer(Modifier.size(10.dp))
@@ -369,6 +375,8 @@ fun HomeScreen(
         // místo dole, aby šel obsah odrolovat nad Kutilovo jeviště
         if (gagOn) Spacer(Modifier.height(StageHeight - 40.dp))
     }
+    // přesčas: voda z nádoby stéká přes celou obrazovku až do vpusti dole
+    OverflowOverlay(clock, overflowing = open != null && worked > 8 * 3_600_000L, animate = animate, panel = panelBounds, modifier = Modifier.fillMaxSize())
     // Kutil sám chodí po spodní části přehledu a střídá scénky (doteky propouští k tlačítkům)
     if (gagOn) {
         PlumberStage(
