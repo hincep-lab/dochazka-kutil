@@ -32,6 +32,10 @@ object AppPrefs {
     fun waterSounds(ctx: Context): Boolean = prefs(ctx).getBoolean("water_sounds", true)
     fun setWaterSounds(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("water_sounds", on).apply()
 
+    /** Vtipná postavička instalatéra dole na hlavní obrazovce. */
+    fun plumberGag(ctx: Context): Boolean = prefs(ctx).getBoolean("plumber_gag", true)
+    fun setPlumberGag(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("plumber_gag", on).apply()
+
     fun statusNotification(ctx: Context): Boolean = prefs(ctx).getBoolean("status_notification", true)
     fun setStatusNotification(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("status_notification", on).apply()
 

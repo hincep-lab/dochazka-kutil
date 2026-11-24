@@ -129,6 +129,27 @@ class ScreenshotTests {
     @Config(qualifiers = "w412dp-h1500dp-xxhdpi")
     fun homePending() = home("03_prehled_dotaz", craftedState(open = false, pending = true))
 
+    /** Scénka s instalatérem v několika okamžicích pod sebou. */
+    @Test
+    @Config(qualifiers = "w412dp-h1600dp-xxhdpi")
+    fun plumberGag() {
+        val times = listOf(2.0f, 3.9f, 5.25f, 6.3f, 7.6f, 10.4f, 12.0f, 14.2f, 15.3f)
+        shoot("13_instalater_scenka") {
+            Box(Modifier.fillMaxSize()) {
+                WetBackground()
+                androidx.compose.foundation.layout.Column {
+                    val clock = androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(37.3f) }
+                    for (e in times) {
+                        cz.kutil.dochazka.ui.PlumberWorkshop(
+                            clock, cz.kutil.dochazka.ui.WaterState(1f, 0f), animate = true, working = false,
+                            onSound = {}, fixedElapsed = e,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     /** Celá aplikace s lištami nad ukázkovými daty (demo režim). */
     private fun app(name: String, tab: String?) {
         val vm = MainViewModel(ApplicationProvider.getApplicationContext())

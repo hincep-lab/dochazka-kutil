@@ -141,6 +141,18 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
                 "Tiché ťuknutí kapky a v přesčasu šumění přetékající vody. Hraje jen při otevřené aplikaci a nikdy v tichém režimu ani na vibracích.",
                 style = MaterialTheme.typography.bodySmall,
             )
+            var gag by remember { mutableStateOf(AppPrefs.plumberGag(context)) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Instalatér Kutil (vtipná scénka)", Modifier.weight(1f))
+                Switch(checked = gag, onCheckedChange = {
+                    gag = it
+                    AppPrefs.setPlumberGag(context, it)
+                })
+            }
+            Text(
+                "Dole na přehledu občas praskne trubka a Kutil ji „opraví“. Spustí se po začátku práce, pak jednou za pár minut a kdykoli po klepnutí.",
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         SectionCard("Kontrola pracovní doby") {

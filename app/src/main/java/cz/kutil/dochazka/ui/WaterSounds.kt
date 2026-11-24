@@ -37,7 +37,32 @@ class WaterSounds(ctx: Context) {
         .build()
     private val drip = pool.load(ctx, R.raw.water_drip, 1)
     private val overflow = pool.load(ctx, R.raw.water_overflow, 1)
+    private val clank = pool.load(ctx, R.raw.gag_clank, 1)
+    private val splash = pool.load(ctx, R.raw.gag_splash, 1)
+    private val boing = pool.load(ctx, R.raw.gag_boing, 1)
+    private val thud = pool.load(ctx, R.raw.gag_thud, 1)
+    private val spray = pool.load(ctx, R.raw.gag_spray, 1)
     private var overflowStream = 0
+    private var sprayStream = 0
+
+    /** Zvuky scénky s instalatérem. */
+    fun gag(s: GagSound) {
+        if (!allowed()) {
+            stopSpray(); return
+        }
+        when (s) {
+            GagSound.BURST_START -> if (sprayStream == 0) sprayStream = pool.play(spray, 0.3f, 0.3f, 0, -1, 1f)
+            GagSound.BURST_STOP -> stopSpray()
+            GagSound.SPLASH -> pool.play(splash, 0.5f, 0.5f, 1, 0, 1f)
+            GagSound.CLANK -> pool.play(clank, 0.45f, 0.45f, 1, 0, 0.95f + Math.random().toFloat() * 0.1f)
+            GagSound.BOING -> pool.play(boing, 0.45f, 0.45f, 1, 0, 1f)
+            GagSound.THUD -> pool.play(thud, 0.5f, 0.5f, 1, 0, 1f)
+        }
+    }
+
+    private fun stopSpray() {
+        if (sprayStream != 0) { pool.stop(sprayStream); sprayStream = 0 }
+    }
 
     private fun allowed() = audio.ringerMode == AudioManager.RINGER_MODE_NORMAL
 
@@ -58,14 +83,15 @@ class WaterSounds(ctx: Context) {
     fun resumeAll() = pool.autoResume()
     fun release() {
         overflow(false)
+        stopSpray()
         pool.release()
     }
 }
 
-/** Napojení zvuků na animaci: kapka zazní přesně při dopadu, přetékání hraje po dobu přesčasu. */
+/** Zvuky vody pro celou hlavní obrazovku; null = vypnuto. Při odchodu z aplikace se pozastaví. */
 @Composable
-fun WaterSoundEffects(enabled: Boolean, clock: State<Float>, drip: DripSync, dripping: Boolean, overflowing: Boolean) {
-    if (!enabled) return
+fun rememberWaterSounds(enabled: Boolean): WaterSounds? {
+    if (!enabled) return null
     val ctx = LocalContext.current
     val sounds = remember { WaterSounds(ctx.applicationContext) }
     val owner = LocalLifecycleOwner.current
@@ -83,6 +109,14 @@ fun WaterSoundEffects(enabled: Boolean, clock: State<Float>, drip: DripSync, dri
             sounds.release()
         }
     }
+    return sounds
+}
+
+/** Napojení zvuků na animaci: kapka zazní přesně při dopadu, přetékání hraje po dobu přesčasu. */
+@Composable
+fun WaterSoundEffects(sounds: WaterSounds?, clock: State<Float>, drip: DripSync, dripping: Boolean, overflowing: Boolean) {
+    if (sounds == null) return
+    DisposableEffect(sounds) { onDispose { sounds.overflow(false) } }
     LaunchedEffect(overflowing) { sounds.overflow(overflowing) }
     LaunchedEffect(dripping) {
         if (!dripping) return@LaunchedEffect

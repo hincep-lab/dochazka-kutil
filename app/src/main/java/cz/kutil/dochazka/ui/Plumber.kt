@@ -1,0 +1,524 @@
+package cz.kutil.dochazka.ui
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.sin
+
+// =============================================================================================
+// Instalatér Kutil – vlastní kreslená postavička (nešika s dobrým srdcem).
+// Scénka: praskne trubka, Kutil přiběhne, dostane proud vody do obličeje, třikrát do trubky
+// praští klíčem (je to horší), oblepí ji páskou, ukáže palec – a na odchodu uklouzne v louži.
+// Vše se kreslí v Compose, žádné obrázky. Čistě pro radost – s docházkou nijak nesouvisí.
+// =============================================================================================
+
+private object T {
+    const val RUN_IN = 0.6f
+    const val ARRIVE = 3.4f
+    const val PEEK = 4.4f
+    const val SPLASH = 5.0f
+    const val DAZED = 5.6f
+    const val CAP_BACK = 6.8f
+    const val BONK = 7.0f
+    val HITS = floatArrayOf(7.4f, 8.1f, 8.8f)
+    const val TAPE = 9.6f
+    const val FIXED = 11.4f
+    const val THUMB = 11.6f
+    const val WALK = 12.8f
+    const val SLIP = 13.8f
+    const val SIT = 14.4f
+    const val UP = 14.9f
+    const val END = 17.5f
+}
+
+/** Zvukové okamžiky scénky (čas od začátku → zvuk). */
+enum class GagSound { BURST_START, BURST_STOP, SPLASH, CLANK, BOING, THUD }
+
+private val GAG_EVENTS = listOf(
+    0.05f to GagSound.BURST_START,
+    T.SPLASH to GagSound.SPLASH,
+    T.HITS[0] to GagSound.CLANK, T.HITS[1] to GagSound.CLANK, T.HITS[2] to GagSound.CLANK,
+    T.FIXED to GagSound.BURST_STOP,
+    T.SLIP to GagSound.BOING,
+    T.SIT - 0.05f to GagSound.THUD,
+)
+
+/**
+ * Dílna dole na hlavní obrazovce: trubka, vpusť a Kutil. Scénka se spustí po zahájení práce,
+ * pak občas sama (jednou za pár minut, jen při práci) a kdykoli po klepnutí.
+ */
+@Composable
+fun PlumberWorkshop(
+    clock: State<Float>,
+    water: WaterState,
+    animate: Boolean,
+    working: Boolean,
+    onSound: (GagSound) -> Unit,
+    modifier: Modifier = Modifier,
+    /** Jen pro testovací snímky: pevný okamžik scénky. */
+    fixedElapsed: Float? = null,
+) {
+    val start = remember { mutableFloatStateOf(-100f) }
+    val running = { t: Float -> t - start.floatValue in 0f..T.END }
+    // automaticky: krátce po začátku práce a pak náhodně jednou za 2,5–5 minut
+    LaunchedEffect(working, animate) {
+        if (!animate || !working) return@LaunchedEffect
+        var next = clock.value + 4f
+        snapshotFlow { clock.value }.collect { t ->
+            if (t >= next && !running(t)) {
+                start.floatValue = t
+                next = t + 150f + (Math.random() * 150).toFloat()
+            }
+        }
+    }
+    // zvuky ve správných okamžicích
+    LaunchedEffect(animate) {
+        if (!animate) return@LaunchedEffect
+        var prev = -1f
+        snapshotFlow { clock.value - start.floatValue }.collect { e ->
+            if (prev >= -1f) for ((at, s) in GAG_EVENTS) if (prev < at && e >= at) onSound(s)
+            prev = e
+        }
+    }
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(170.dp)
+            .semantics { contentDescription = "Instalatér Kutil – klepnutím spustíš scénku" }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                if (animate && !running(clock.value)) start.floatValue = clock.value
+            },
+    ) {
+        val pipes = rememberPipeImages()
+        Canvas(Modifier.fillMaxSize()) {
+            val t = clock.value
+            val e = fixedElapsed ?: if (animate) t - start.floatValue else -1f
+            drawWorkshop(e, t, water, pipes)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+
+private fun lerp(a: Float, b: Float, k: Float) = a + (b - a) * k.coerceIn(0f, 1f)
+private fun seg(e: Float, a: Float, b: Float) = ((e - a) / (b - a)).coerceIn(0f, 1f)
+private fun ease(k: Float) = k * k * (3 - 2 * k)
+
+private fun sprayLevel(e: Float): Float = when {
+    e < 0f || e > T.END -> 0f
+    e < T.HITS[0] -> min(1f, e / 0.2f) * 0.9f
+    e < T.HITS[1] -> 1.2f
+    e < T.HITS[2] -> 1.5f
+    e < T.TAPE -> 1.8f // čím víc tluče, tím víc to stříká
+    e < T.FIXED -> lerp(1.8f, 0f, seg(e, T.TAPE + 0.4f, T.FIXED))
+    else -> 0f
+}
+
+private fun DrawScope.drawWorkshop(e: Float, t: Float, water: WaterState, pipes: PipeImages) {
+    val w = size.width
+    val h = size.height
+    val u = 1.dp.toPx()
+    val floorY = h - 14 * u
+    val pipeY = 26 * u
+    val d = 20 * u
+    val crackX = w * 0.50f
+    val drainX = w * 0.80f
+
+    // podlaha s mokrým leskem
+    drawRect(Brush.verticalGradient(listOf(Color(0x00122A4A), Color(0x88102440), Color(0xCC0A1A30)), startY = floorY - 30 * u, endY = h), Offset(0f, floorY - 30 * u), Size(w, h - floorY + 30 * u))
+    drawLine(Color(0x5582B8F0), Offset(0f, floorY), Offset(w, floorY), strokeWidth = 1 * u)
+
+    // vodorovná trubka podél stěny
+    val k = d / 64f
+    fun img(i: androidx.compose.ui.graphics.ImageBitmap, x: Float, y: Float, ww: Float, hh: Float) = drawImage(
+        i, srcOffset = androidx.compose.ui.unit.IntOffset.Zero, srcSize = androidx.compose.ui.unit.IntSize(i.width, i.height),
+        dstOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt()), dstSize = androidx.compose.ui.unit.IntSize(ww.toInt(), hh.toInt()),
+        filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+    )
+    img(pipes.h, -2f, pipeY, w + 4f, d)
+    for (cx in listOf(w * 0.12f, w * 0.88f)) img(pipes.clampH, cx, pipeY + d / 2 - pipes.clampH.height * k / 2, pipes.clampH.width * k, pipes.clampH.height * k)
+
+    val spray = sprayLevel(e)
+    val cracked = e in 0f..T.END
+    if (cracked) {
+        // prasklina
+        val p = Path().apply {
+            moveTo(crackX - 7 * u, pipeY + d * 0.55f); lineTo(crackX - 2 * u, pipeY + d * 0.35f)
+            lineTo(crackX + 1 * u, pipeY + d * 0.7f); lineTo(crackX + 6 * u, pipeY + d * 0.45f)
+        }
+        drawPath(p, Color(0xFF1A2230), style = Stroke(2 * u, cap = StrokeCap.Round))
+    }
+    // lepicí páska
+    if (e >= T.TAPE && e <= T.END) {
+        val k2 = ease(seg(e, T.TAPE + 0.3f, T.FIXED))
+        val tw = 22 * u * k2
+        if (tw > 1) {
+            drawRect(Color(0xFF9AA0A8), Offset(crackX - tw / 2, pipeY - 1 * u), Size(tw, d + 2 * u))
+            for (i in 0 until 4) {
+                val xx = crackX - tw / 2 + tw * (i + 0.5f) / 4
+                drawLine(Color(0xFF6E747C), Offset(xx, pipeY), Offset(xx - 3 * u, pipeY + d), strokeWidth = 1 * u)
+            }
+            drawLine(Color.White.copy(alpha = 0.5f), Offset(crackX - tw / 2, pipeY + 4 * u), Offset(crackX + tw / 2, pipeY + 4 * u), strokeWidth = 1.5f * u)
+        }
+    }
+
+    // louže pod prasklinou, která stéká k vpusti
+    val puddle = when {
+        e < 0f || e > T.END -> 0f
+        e < T.FIXED -> min(1f, e / 4f)
+        else -> 1f - seg(e, T.FIXED + 2f, T.END) * 0.6f
+    }
+    if (puddle > 0f) {
+        val pw = (40 + 70 * puddle) * u
+        drawOval(Brush.radialGradient(listOf(Color(0x8854B6FF), Color(0x2240A0FF), Color.Transparent), center = Offset(crackX + 20 * u, floorY + 2 * u), radius = pw), Offset(crackX + 20 * u - pw, floorY - 3 * u), Size(pw * 2, 10 * u))
+        drawLine(Color(0x9954B6FF), Offset(crackX + 20 * u, floorY + 1 * u), Offset(lerp(crackX, drainX, puddle), floorY + 1 * u), strokeWidth = 3 * u * puddle, cap = StrokeCap.Round)
+    }
+
+    // vpusť v podlaze
+    drawOval(Color(0xFF0A111C), Offset(drainX - 22 * u, floorY - 3 * u), Size(44 * u, 9 * u))
+    drawOval(Color(0xFFB7C3D0), Offset(drainX - 24 * u, floorY - 4 * u), Size(48 * u, 11 * u), style = Stroke(2.5f * u))
+    for (i in -2..2) drawLine(Color(0xFF55606C), Offset(drainX + i * 7 * u, floorY - 2 * u), Offset(drainX + i * 7 * u, floorY + 5 * u), strokeWidth = 1.5f * u)
+
+    // proud vody z trubky
+    if (spray > 0f) drawSpray(Offset(crackX, pipeY + d * 0.6f), spray, t, floorY, u)
+
+    // Kutil
+    if (e in 0f..T.END) {
+        val pose = poseAt(e, t, crackX, w, u)
+        drawPlumber(pose, floorY, u)
+    } else {
+        // mimo scénku: jen nenápadná cedulka
+        drawCircle(Color(0x33FFFFFF), 2 * u, Offset(w * 0.06f, floorY - 6 * u))
+    }
+}
+
+private fun DrawScope.drawSpray(o: Offset, s: Float, t: Float, floorY: Float, u: Float) {
+    val n = (10 * s).toInt() + 4
+    for (i in 0 until n) {
+        val spread = (i.toFloat() / n - 0.5f)
+        val vx = (60f + 110f * s) * spread * u
+        val vy = (-20f - 40f * s * (0.5f - abs(spread))) * u
+        for (j in 0 until 6) {
+            val q = ((t * 1.6f + i * 0.137f + j / 6f) % 1f)
+            val tt = q * 0.9f
+            val x = o.x + vx * tt * 3f
+            val y = o.y + vy * tt * 3f + 0.5f * 600f * u * tt * tt
+            if (y > floorY) continue
+            val r = (1.4f + (1 - q) * 1.6f) * u
+            drawCircle(Color(0xCC8FD3FF), r, Offset(x, y))
+            drawCircle(Color.White.copy(alpha = 0.7f), r * 0.4f, Offset(x - r * 0.3f, y - r * 0.3f))
+        }
+    }
+    // mlha
+    drawCircle(Brush.radialGradient(listOf(Color(0x5596D6FF), Color.Transparent), center = o, radius = 26 * u * s), 26 * u * s, o)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Póza postavičky v čase scénky
+// ---------------------------------------------------------------------------------------------
+
+private class Pose(
+    val x: Float,
+    val facing: Float, // 1 = doprava, -1 = doleva
+    val run: Float, // 0..1 intenzita běhu
+    val stride: Float, // fáze kroku
+    val armR: Float, // úhel pravé ruky (stupně, 0 = dolů, 90 = dopředu)
+    val armL: Float,
+    val lean: Float, // předklon 0..1
+    val tilt: Float, // otočení celé postavy (pád)
+    val sit: Float, // posazení na zadek 0..1
+    val capLift: Float, // jak vysoko je čepice nad hlavou
+    val capSpin: Float,
+    val wet: Boolean,
+    val dazed: Float,
+    val grin: Float,
+    val wink: Boolean,
+    val thumb: Boolean,
+    val tape: Boolean,
+    val eyesClosed: Boolean,
+)
+
+private fun poseAt(e: Float, t: Float, crackX: Float, w: Float, u: Float): Pose {
+    val standX = crackX - 30 * u
+    var x = standX
+    var facing = 1f
+    var run = 0f
+    var armR = 10f
+    var armL = -10f
+    var lean = 0f
+    var tilt = 0f
+    var sit = 0f
+    var capLift = 0f
+    var capSpin = 0f
+    var dazed = 0f
+    var grin = 0f
+    var wink = false
+    var thumb = false
+    var tape = false
+    var closed = false
+    val wet = e >= T.SPLASH
+    when {
+        e < T.ARRIVE -> {
+            val k = seg(e, T.RUN_IN, T.ARRIVE)
+            x = lerp(-50 * u, standX, k)
+            run = if (e < T.RUN_IN) 0f else 1f
+            armR = 30f * sin(t * 18f); armL = -30f * sin(t * 18f)
+        }
+        e < T.PEEK -> { // drbe se na hlavě
+            armR = 160f + 12f * sin(t * 20f)
+        }
+        e < T.SPLASH -> { // nakloní se k prasklině
+            lean = ease(seg(e, T.PEEK, T.SPLASH))
+            x = standX + 10 * u * lean
+        }
+        e < T.DAZED -> { // proud vody do obličeje → odletí dozadu, čepice letí
+            val k = seg(e, T.SPLASH, T.DAZED)
+            x = standX + 10 * u - 26 * u * ease(k)
+            tilt = -14f * sin(k * PI.toFloat())
+            armR = 120f; armL = -120f
+            closed = true
+            capLift = 60 * u * sin(k * PI.toFloat() * 0.5f)
+            capSpin = 360f * k
+        }
+        e < T.BONK -> { // omámený, čepice padá zpět
+            x = standX - 16 * u
+            dazed = 1f
+            val k = seg(e, T.DAZED, T.CAP_BACK)
+            capLift = lerp(60 * u, 0f, ease(k)) + if (k < 1f) 8 * u * sin(k * 12f) else 0f
+            capSpin = 360f + 200f * k
+            if (e > T.CAP_BACK) { dazed = 0.6f; armR = 20f + 10f * sin(t * 4f) }
+        }
+        e < T.TAPE -> { // tluče klíčem
+            x = lerp(standX - 16 * u, standX, seg(e, T.BONK, T.BONK + 0.3f))
+            val phase = ((e - T.BONK) % 0.7f) / 0.7f
+            armR = if (phase < 0.55f) lerp(60f, 175f, phase / 0.55f) else lerp(175f, 70f, (phase - 0.55f) / 0.45f)
+            grin = -0.5f
+            lean = 0.2f
+        }
+        e < T.THUMB -> { // lepí páskou, předkloněný
+            lean = 0.75f
+            tape = true
+            armR = 110f + 25f * sin(t * 14f)
+            armL = 95f + 25f * cos(t * 14f)
+        }
+        e < T.WALK -> { // palec nahoru, mrknutí
+            thumb = true
+            grin = 1f
+            wink = true
+            armR = 150f
+        }
+        e < T.SLIP -> { // odchází spokojeně
+            x = lerp(standX, standX + 70 * u, seg(e, T.WALK, T.SLIP))
+            run = 0.5f
+            grin = 0.6f
+            armR = 20f * sin(t * 9f); armL = -20f * sin(t * 9f)
+        }
+        e < T.SIT -> { // uklouzne v louži – nohy nahoru
+            val k = seg(e, T.SLIP, T.SIT)
+            x = standX + 70 * u + 14 * u * k
+            tilt = -70f * ease(k)
+            sit = ease(k)
+            armR = 150f; armL = -150f
+            capLift = 18 * u * sin(k * PI.toFloat())
+            closed = true
+        }
+        e < T.UP -> {
+            x = standX + 84 * u
+            sit = 1f
+            tilt = lerp(-70f, -10f, seg(e, T.SIT, T.UP))
+            dazed = 0.8f
+        }
+        else -> { // vstane a odejde
+            val k = seg(e, T.UP, T.END)
+            sit = 1f - ease(seg(e, T.UP, T.UP + 0.4f))
+            x = lerp(standX + 84 * u, w + 60 * u, ease(seg(e, T.UP + 0.4f, T.END)))
+            run = if (k > 0.15f) 1f else 0f
+            grin = 0.3f
+            armR = 30f * sin(t * 18f); armL = -30f * sin(t * 18f)
+        }
+    }
+    return Pose(x, facing, run, t * 14f, armR, armL, lean, tilt, sit, capLift, capSpin, wet, dazed, grin, wink, thumb, tape, closed)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Kreslení postavičky (buclatý instalatér v lacláčích)
+// ---------------------------------------------------------------------------------------------
+
+private val Skin = Color(0xFFF2BF94)
+private val SkinDark = Color(0xFFD9976B)
+private val Overalls = Color(0xFF2F66C2)
+private val OverallsDark = Color(0xFF1E478C)
+private val Shirt = Color(0xFF7E9A86)
+private val Cap = Color(0xFFF08C12)
+private val Boot = Color(0xFF5A3A22)
+private val Ink = Color(0xFF15120F)
+
+private fun DrawScope.drawPlumber(p: Pose, floorY: Float, u: Float) {
+    val bob = if (p.run > 0f) abs(sin(p.stride)) * 3 * u * p.run else 0f
+    translate(p.x, floorY - bob + p.sit * 12 * u) {
+        scale(p.facing, 1f, pivot = Offset.Zero) {
+            rotate(p.tilt, pivot = Offset(0f, -10 * u)) {
+                // stín
+                drawOval(Color(0x55000000), Offset(-22 * u, -3 * u + bob), Size(44 * u, 7 * u))
+                // nohy
+                val swing = if (p.run > 0f) sin(p.stride) * 32f * p.run else 0f
+                for ((i, a) in listOf(swing, -swing).withIndex()) {
+                    val hx = if (i == 0) -7 * u else 7 * u
+                    val legLen = if (p.sit > 0f) lerp(20 * u, 14 * u, p.sit) else 20 * u
+                    val ang = if (p.sit > 0f) lerp(a, if (i == 0) -75f else -95f, p.sit) else a
+                    rotate(ang, pivot = Offset(hx, -20 * u)) {
+                        drawRoundRect(OverallsDark, Offset(hx - 5 * u, -20 * u), Size(10 * u, legLen), cornerRadius = androidx.compose.ui.geometry.CornerRadius(4 * u))
+                        drawOval(Boot, Offset(hx - 6 * u, -20 * u + legLen - 4 * u), Size(15 * u, 8 * u))
+                    }
+                }
+                rotate(p.lean * 28f, pivot = Offset(0f, -20 * u)) {
+                    // zadní ruka
+                    drawArm(Offset(-13 * u, -48 * u), p.armL, u, wrench = false, thumb = false)
+                    // tričko a velké bříško v lacláčích
+                    drawOval(Shirt, Offset(-19 * u, -62 * u), Size(38 * u, 30 * u))
+                    drawOval(Overalls, Offset(-22 * u, -56 * u), Size(46 * u, 40 * u))
+                    drawOval(Color.White.copy(alpha = 0.18f), Offset(-12 * u, -52 * u), Size(18 * u, 12 * u))
+                    // náprsenka, šle, knoflíky
+                    drawRoundRect(Overalls, Offset(-10 * u, -62 * u), Size(20 * u, 14 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(3 * u))
+                    drawLine(OverallsDark, Offset(-9 * u, -61 * u), Offset(-13 * u, -70 * u), strokeWidth = 3 * u)
+                    drawLine(OverallsDark, Offset(9 * u, -61 * u), Offset(11 * u, -70 * u), strokeWidth = 3 * u)
+                    drawCircle(Cap, 2 * u, Offset(-7 * u, -59 * u)); drawCircle(Cap, 2 * u, Offset(7 * u, -59 * u))
+                    // kapsa s tužkou
+                    drawRoundRect(OverallsDark, Offset(-6 * u, -54 * u), Size(12 * u, 8 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
+                    drawLine(Color(0xFFE8C040), Offset(3 * u, -54 * u), Offset(5 * u, -60 * u), strokeWidth = 1.5f * u)
+                    // při předklonu vykoukne klasická instalatérská „spára“
+                    if (p.lean > 0.5f) {
+                        drawArc(Skin, 180f, 180f, true, Offset(-24 * u, -34 * u), Size(10 * u, 8 * u))
+                        drawLine(Ink.copy(alpha = 0.6f), Offset(-19 * u, -34 * u), Offset(-19 * u, -30 * u), strokeWidth = 1 * u)
+                    }
+                    // hlava
+                    drawHead(Offset(2 * u, -76 * u), p, u)
+                    // přední ruka (s klíčem nebo palcem)
+                    drawArm(Offset(13 * u, -50 * u), p.armR, u, wrench = !p.thumb && !p.tape, thumb = p.thumb)
+                    if (p.tape) drawCircle(Color(0xFF9AA0A8), 5 * u, Offset(24 * u, -38 * u), style = Stroke(3 * u))
+                }
+            }
+        }
+        // létající čepice (mimo otočení postavy)
+        if (p.capLift > 0.5f) {
+            rotate(p.capSpin, pivot = Offset(4 * u, -92 * u - p.capLift)) { drawCap(Offset(4 * u, -92 * u - p.capLift), u, p.facing) }
+        }
+        // hvězdičky nad hlavou
+        if (p.dazed > 0f) {
+            for (i in 0 until 3) {
+                val a = p.stride * 0.4f + i * 2.1f
+                val c = Offset(4 * u + 16 * u * cos(a), -96 * u + 5 * u * sin(a))
+                drawStar(c, 4 * u, Color(0xFFFFD54A).copy(alpha = p.dazed))
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawArm(sh: Offset, angle: Float, u: Float, wrench: Boolean, thumb: Boolean) {
+    rotate(-angle, pivot = sh) {
+        drawRoundRect(Shirt, Offset(sh.x - 4 * u, sh.y), Size(8 * u, 18 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(4 * u))
+        val hand = Offset(sh.x, sh.y + 20 * u)
+        drawCircle(Skin, 4.5f * u, hand)
+        if (thumb) drawRoundRect(Skin, Offset(hand.x - 1.5f * u, hand.y - 9 * u), Size(3.5f * u, 7 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
+        if (wrench) {
+            // hasák
+            drawLine(Color(0xFF8C969F), hand, Offset(hand.x, hand.y + 16 * u), strokeWidth = 3.5f * u, cap = StrokeCap.Round)
+            drawLine(Color(0xFFC62828), Offset(hand.x, hand.y + 2 * u), Offset(hand.x, hand.y + 9 * u), strokeWidth = 4.5f * u, cap = StrokeCap.Round)
+            drawArc(Color(0xFFB0BAC4), 200f, 260f, false, Offset(hand.x - 5 * u, hand.y + 14 * u), Size(10 * u, 9 * u), style = Stroke(3 * u))
+        }
+    }
+}
+
+private fun DrawScope.drawHead(c: Offset, p: Pose, u: Float) {
+    // ucho, hlava, tváře
+    drawCircle(SkinDark, 4 * u, Offset(c.x - 12 * u, c.y + 1 * u))
+    drawCircle(Skin, 15 * u, c)
+    drawCircle(Color(0x55FF6F61), 4 * u, Offset(c.x + 7 * u, c.y + 5 * u))
+    // strniště
+    for (i in 0 until 9) drawCircle(Ink.copy(alpha = 0.18f), 0.7f * u, Offset(c.x - 6 * u + i * 2.4f * u, c.y + 10 * u + (i % 2) * 1.5f * u))
+    // oči
+    if (p.eyesClosed || p.dazed > 0.5f) {
+        drawLine(Ink, Offset(c.x + 1 * u, c.y - 4 * u), Offset(c.x + 6 * u, c.y - 1 * u), strokeWidth = 1.6f * u)
+        drawLine(Ink, Offset(c.x + 1 * u, c.y - 1 * u), Offset(c.x + 6 * u, c.y - 4 * u), strokeWidth = 1.6f * u)
+    } else {
+        drawCircle(Color.White, 4 * u, Offset(c.x + 3 * u, c.y - 3 * u))
+        drawCircle(Ink, 1.8f * u, Offset(c.x + 4.5f * u, c.y - 2.5f * u))
+        if (p.wink) drawLine(Ink, Offset(c.x + 9 * u, c.y - 3 * u), Offset(c.x + 14 * u, c.y - 3 * u), strokeWidth = 1.6f * u)
+        else { drawCircle(Color.White, 3.6f * u, Offset(c.x + 11 * u, c.y - 3 * u)); drawCircle(Ink, 1.6f * u, Offset(c.x + 12.2f * u, c.y - 2.5f * u)) }
+    }
+    // obočí
+    drawLine(Ink, Offset(c.x - 1 * u, c.y - 9 * u), Offset(c.x + 6 * u, c.y - 10 * u + p.grin * 1.5f * u), strokeWidth = 2 * u, cap = StrokeCap.Round)
+    // velký červený nos
+    drawOval(Color(0xFFE35D4F), Offset(c.x + 8 * u, c.y - 1 * u), Size(11 * u, 9 * u))
+    drawCircle(Color.White.copy(alpha = 0.5f), 1.5f * u, Offset(c.x + 11 * u, c.y + 1 * u))
+    // pusa
+    if (p.grin > 0.2f) drawArc(Ink, 10f, 160f, false, Offset(c.x + 1 * u, c.y + 4 * u), Size(10 * u, 7 * u), style = Stroke(1.6f * u))
+    else if (p.grin < -0.2f) drawLine(Ink, Offset(c.x + 2 * u, c.y + 10 * u), Offset(c.x + 9 * u, c.y + 9 * u), strokeWidth = 1.6f * u)
+    else drawOval(Ink, Offset(c.x + 4 * u, c.y + 8 * u), Size(4 * u, 3 * u))
+    // hustý knír
+    drawOval(Color(0xFF2A1A12), Offset(c.x + 2 * u, c.y + 4 * u), Size(10 * u, 5 * u))
+    drawOval(Color(0xFF2A1A12), Offset(c.x + 9 * u, c.y + 4 * u), Size(9 * u, 5 * u))
+    // čepice na hlavě
+    if (p.capLift <= 0.5f) drawCap(Offset(c.x + 2 * u, c.y - 16 * u), u, 1f)
+    else { // rozcuchané vlasy bez čepice
+        for (i in -3..3) drawLine(Color(0xFF2A1A12), Offset(c.x + i * 3 * u, c.y - 13 * u), Offset(c.x + i * 4 * u, c.y - 19 * u), strokeWidth = 1.6f * u)
+    }
+    // mokrý obličej
+    if (p.wet) {
+        for (i in 0 until 3) {
+            val y = c.y - 6 * u + ((p.stride * 0.5f + i * 0.33f) % 1f) * 18 * u
+            drawDrop(Offset(c.x - 8 * u + i * 8 * u, y), 1.6f * u, 1.3f)
+        }
+    }
+}
+
+private fun DrawScope.drawCap(c: Offset, u: Float, facing: Float) {
+    drawArc(Cap, 180f, 180f, true, Offset(c.x - 14 * u, c.y - 8 * u), Size(28 * u, 18 * u))
+    drawRoundRect(Color(0xFFC46A04), Offset(c.x + 4 * u * facing - (if (facing < 0) 16 * u else 0f), c.y - 1 * u), Size(16 * u, 4 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
+    drawCircle(Color.White, 3.5f * u, Offset(c.x - 2 * u, c.y - 3 * u))
+    drawLine(Cap, Offset(c.x - 3.5f * u, c.y - 5 * u), Offset(c.x - 3.5f * u, c.y - 1 * u), strokeWidth = 1 * u)
+    drawLine(Cap, Offset(c.x - 3.5f * u, c.y - 3 * u), Offset(c.x - 0.5f * u, c.y - 5 * u), strokeWidth = 1 * u)
+    drawLine(Cap, Offset(c.x - 3.5f * u, c.y - 3 * u), Offset(c.x - 0.5f * u, c.y - 1 * u), strokeWidth = 1 * u)
+}
+
+private fun DrawScope.drawStar(c: Offset, r: Float, color: Color) {
+    val path = Path()
+    for (i in 0 until 10) {
+        val a = -PI / 2 + i * PI / 5
+        val rr = if (i % 2 == 0) r else r * 0.45f
+        val x = c.x + (rr * cos(a)).toFloat()
+        val y = c.y + (rr * sin(a)).toFloat()
+        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+    }
+    path.close()
+    drawPath(path, color)
+}

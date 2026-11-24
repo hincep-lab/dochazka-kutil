@@ -128,6 +128,8 @@ fun HomeScreen(
     val water = rememberWaterState(open != null, animate)
     val dripSync = remember { DripSync() }
     val soundsOn = animate && remember(resumeTick) { soundsEnabled(context) }
+    val sounds = rememberWaterSounds(soundsOn)
+    val gagOn = animate && remember(resumeTick) { AppPrefs.plumberGag(context) }
     val reportStart = open?.let { it.editedStart ?: Rounding.roundToHalfHour(Instant.ofEpochMilli(it.rawStart)).toEpochMilli() }
     val worked = reportStart?.let { now - it } ?: 0L
     val runStart = reportStart
@@ -172,7 +174,7 @@ fun HomeScreen(
             open != null && reportStart != null -> {
                 val startDay = Fmt.zoned(open.rawStart).toLocalDate()
                 val over = worked > 8 * 3_600_000L
-                WaterSoundEffects(soundsOn, clock, dripSync, dripping = water.flow > 0.85f, overflowing = over)
+                WaterSoundEffects(sounds, clock, dripSync, dripping = water.flow > 0.85f, overflowing = over)
                 WaterPanel(GlassTone.WORKING, clock, water, worked / (8f * 3_600_000f), animate, drip = dripSync) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(R.drawable.ic_engineering), null, tint = Color.White, modifier = Modifier.size(if (big) 26.dp else 32.dp))
@@ -363,7 +365,11 @@ fun HomeScreen(
                 Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = "Stav sledování", tint = Ind.onBgDim)
             }
         }
-        AnimatedDrain(clock, water, animate)
+        if (gagOn) {
+            PlumberWorkshop(clock, water, animate, working = open != null, onSound = { sounds?.gag(it) })
+        } else {
+            AnimatedDrain(clock, water, animate)
+        }
     }
     }
 
