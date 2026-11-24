@@ -49,15 +49,15 @@ object Notifier {
                 .putExtra(EXTRA_SHIFT_ID, shiftId).putExtra(EXTRA_END_AT, at ?: -1L),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val text = "Zaznamenáno ${day(rawStartMs)} v ${time(rawStartMs)}" +
+        // Bez běžících stopek (Samsung je ukazuje vedle času a matou) – odpracovaný čas se obnovuje každou půlhodinu.
+        val sofar = ((System.currentTimeMillis() - reportStartMs).coerceAtLeast(0) / 60_000L)
+        val text = "Zatím ${sofar / 60}:%02d h · zaznamenáno v ${time(rawStartMs)}".format(sofar % 60) +
             (returnAtMs?.let { " · návrat domů v ${time(it)}" } ?: "")
         val builder = NotificationCompat.Builder(ctx, CHANNEL_STATUS)
             .setSmallIcon(R.drawable.ic_notif)
             .setContentTitle("V práci od ${time(reportStartMs)}")
             .setContentText(text)
-            .setWhen(rawStartMs)
-            .setShowWhen(true)
-            .setUsesChronometer(true)
+            .setShowWhen(false)
             .setOngoing(true)
             .setSilent(true)
             .setOnlyAlertOnce(true)

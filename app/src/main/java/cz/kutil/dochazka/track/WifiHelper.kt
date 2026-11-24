@@ -21,6 +21,16 @@ object WifiHelper {
         }
     }
 
+    /** Je telefon právě připojený k nějaké Wi-Fi? (Na rozdíl od názvu sítě to Android říká vždy.) */
+    fun isWifiConnected(ctx: Context): Boolean = try {
+        val cm = ctx.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        cm.allNetworks.any { n ->
+            cm.getNetworkCapabilities(n)?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
+        }
+    } catch (e: Exception) {
+        false
+    }
+
     /** true = právě připojen k domácí síti; null = neznámo nebo domácí síť není nastavena. */
     suspend fun isOnHomeWifi(ctx: Context): Boolean? {
         val home = Graph.realDb(ctx).dao().zone()?.wifiSsid?.takeIf { it.isNotBlank() } ?: return null

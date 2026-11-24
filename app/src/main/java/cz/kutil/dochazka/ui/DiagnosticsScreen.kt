@@ -75,6 +75,7 @@ fun DiagnosticsScreen(vm: MainViewModel, state: UiState) {
     val lastExit = remember(diagKey) { AppPrefs.lastExitAt(context) }
     val lastEnter = remember(diagKey) { AppPrefs.lastEnterAt(context) }
     val currentSsid = remember(diagKey) { WifiHelper.currentSsid(context) }
+    val wifiConnected = remember(diagKey) { WifiHelper.isWifiConnected(context) }
     val zone = state.zone
     val tracking = state.settings.trackingEnabled
 
@@ -127,8 +128,16 @@ fun DiagnosticsScreen(vm: MainViewModel, state: UiState) {
 
         Text("Domácí zóna", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         StatusRow(
-            if (zone != null) Level.OK else Level.BAD, "Domácí bod",
-            if (zone != null) "Nastaven, poloměr ${zone.radiusM.toInt()} m." else "Není nastaven – nastav ho v Nastavení.",
+            when {
+                zone == null -> Level.BAD
+                zone.radiusM < 150f -> Level.WARN
+                else -> Level.OK
+            }, "Domácí bod",
+            when {
+                zone == null -> "Není nastaven – nastav ho v Nastavení."
+                zone.radiusM < 150f -> "Nastaven, poloměr ${zone.radiusM.toInt()} m. Malá zóna dává falešné odchody a návraty (skoky GPS v noci) – doporučeno 150–250 m (Nastavení → Domácí zóna)."
+                else -> "Nastaven, poloměr ${zone.radiusM.toInt()} m."
+            },
         )
         StatusRow(
             when {
@@ -154,6 +163,7 @@ fun DiagnosticsScreen(vm: MainViewModel, state: UiState) {
             when {
                 ssid.isBlank() -> Level.OFF
                 currentSsid == ssid -> Level.OK
+                !wifiConnected -> Level.OFF
                 currentSsid == null -> Level.WARN
                 else -> Level.OFF
             },
@@ -161,6 +171,7 @@ fun DiagnosticsScreen(vm: MainViewModel, state: UiState) {
             when {
                 ssid.isBlank() -> "Není nastavena (je nepovinná)."
                 currentSsid == ssid -> "Nastavena „$ssid“ – telefon je k ní právě připojen."
+                !wifiConnected -> "Nastavena „$ssid“. Telefon teď není připojený k žádné Wi-Fi (jsi mimo domov nebo je Wi-Fi vypnutá) – v pořádku."
                 currentSsid == null -> "Nastavena „$ssid“. Název připojené sítě teď nejde přečíst (Wi-Fi vypnutá, nepřipojeno, nebo to Android nedovolil). Bere se to jako „nevím“, nikdy jako důkaz, že nejsi doma."
                 else -> "Nastavena „$ssid“ – telefon je teď připojen k jiné síti."
             },
