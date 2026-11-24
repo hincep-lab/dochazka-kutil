@@ -15,13 +15,14 @@ import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
 /**
- * Automatická záloha jednou týdně do složky, kterou uživatel jednou vybere (Storage Access Framework).
+ * Automatická záloha jednou denně do složky, kterou uživatel jednou vybere (Storage Access Framework).
+ * Když se od poslední zálohy nic nezměnilo, nový soubor nevzniká.
  * Soubory se jmenují Dochazka_auto_RRRR-MM-DD.json; ponechá se posledních [KEEP], starší automatické
  * zálohy (jen s tímto názvem) se smažou. Ručně uložené zálohy ani jiné soubory ve složce se nemění.
  */
 object AutoBackup {
     const val PREFIX = "Dochazka_auto_"
-    const val KEEP = 6
+    const val KEEP = 14
 
     fun folder(ctx: Context): Uri? = AppPrefs.autoBackupFolder(ctx)?.let { Uri.parse(it) }
 
@@ -49,8 +50,19 @@ object AutoBackup {
         }.getOrNull() ?: DocumentsContract.getTreeDocumentId(tree).substringAfterLast(':')
     }
 
-    /** Vytvoří zálohu teď. Vrací název souboru. */
-    suspend fun runNow(ctx: Context): String {
+    /**
+     * Vytvoří zálohu teď. Vrací název souboru, nebo null, když se od poslední automatické zálohy
+     * nic nezměnilo (jen při [force] = false).
+     */
+    suspend fun runNow(ctx: Context, force: Boolean = true): String? {
+        val json = Backup.export(Graph.realDb(ctx), AppPrefs.toJson(ctx))
+        val digest = org.json.JSONObject(json).optString("sha256")
+        if (!force && digest.isNotEmpty() && digest == AppPrefs.autoBackupDigest(ctx)) {
+            // Poslední záloha je stále aktuální – počítá se jako zálohováno (bez zbytečné připomínky).
+            AppPrefs.setLastBackupAt(ctx, System.currentTimeMillis())
+            AppPrefs.setAutoBackupResult(ctx, System.currentTimeMillis(), "")
+            return null
+        }
         val tree = folder(ctx) ?: throw IOException("Složka pro automatickou zálohu není vybraná.")
         val resolver = ctx.contentResolver
         val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
@@ -68,7 +80,6 @@ object AutoBackup {
         existing.filter { it.first == name }.forEach {
             DocumentsContract.deleteDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, it.second))
         }
-        val json = Backup.export(Graph.realDb(ctx), AppPrefs.toJson(ctx))
         val doc = DocumentsContract.createDocument(resolver, parent, "application/json", name)
             ?: throw IOException("Soubor zálohy se nepodařilo vytvořit.")
         resolver.openOutputStream(doc, "wt")?.use { it.write(json.toByteArray(Charsets.UTF_8)) }
@@ -87,12 +98,14 @@ object AutoBackup {
         val now = System.currentTimeMillis()
         AppPrefs.setLastBackupAt(ctx, now)
         AppPrefs.setAutoBackupResult(ctx, now, "")
+        AppPrefs.setAutoBackupDigest(ctx, digest)
         return name
     }
 
     fun ensureScheduled(ctx: Context) {
-        val request = PeriodicWorkRequestBuilder<AutoBackupWorker>(7, TimeUnit.DAYS).build()
-        WorkManager.getInstance(ctx).enqueueUniquePeriodicWork("auto_backup", ExistingPeriodicWorkPolicy.KEEP, request)
+        val request = PeriodicWorkRequestBuilder<AutoBackupWorker>(1, TimeUnit.DAYS).build()
+        // UPDATE: dřívější týdenní plán se přepne na denní, aniž by se ztratil.
+        WorkManager.getInstance(ctx).enqueueUniquePeriodicWork("auto_backup", ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 }
 
@@ -101,7 +114,7 @@ class AutoBackupWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
         val app = applicationContext
         if (AutoBackup.folder(app) == null) return Result.success()
         return try {
-            AutoBackup.runNow(app)
+            AutoBackup.runNow(app, force = false)
             Result.success()
         } catch (e: Exception) {
             AppPrefs.setAutoBackupResult(app, System.currentTimeMillis(), e.message ?: "Záloha se nepodařila.")

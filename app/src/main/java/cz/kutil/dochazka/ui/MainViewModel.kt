@@ -449,7 +449,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setAutoBackupFolder(tree: Uri?) = launchSafe {
         AutoBackup.setFolder(ctx, tree)
         if (tree != null) {
-            val name = withContext(Dispatchers.IO) { AutoBackup.runNow(ctx) }
+            val name = withContext(Dispatchers.IO) { AutoBackup.runNow(ctx, force = true) }
             message.value = "Automatická záloha zapnuta. První záloha: $name"
         } else {
             message.value = "Automatická záloha vypnuta."

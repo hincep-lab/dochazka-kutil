@@ -213,7 +213,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
                 val folderName = remember(autoTick) { AutoBackup.folderName(context) }
                 val result = remember(autoTick) { AppPrefs.autoBackupResult(context) }
                 if (folderName == null) {
-                    Text("Vypnutá. Vyber složku a aplikace do ní bude jednou týdně sama ukládat zálohu.")
+                    Text("Vypnutá. Vyber složku a aplikace do ní bude každý den sama ukládat zálohu.")
                     Button(onClick = { folderLauncher.launch(null) }, modifier = Modifier.fillMaxWidth()) { Text("Vybrat složku a zapnout") }
                 } else {
                     Text("Složka: $folderName", fontWeight = FontWeight.Bold)
@@ -228,7 +228,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
                     TextButton(onClick = { vm.setAutoBackupFolder(null) }) { Text("Vypnout automatickou zálohu") }
                 }
                 Text(
-                    "Soubory Dochazka_auto_RRRR-MM-DD.json, ponechá se posledních ${AutoBackup.KEEP} (starší automatické se smažou, jiné soubory ve složce zůstávají). " +
+                    "Jednou denně, jen když se od poslední zálohy něco změnilo. Soubory Dochazka_auto_RRRR-MM-DD.json, ponechá se posledních ${AutoBackup.KEEP} (starší automatické se smažou, jiné soubory ve složce zůstávají). " +
                         "Nejlépe vyber složku v telefonu, např. Dokumenty – cloudové složky Android často nepovolí.",
                     style = MaterialTheme.typography.bodySmall,
                 )

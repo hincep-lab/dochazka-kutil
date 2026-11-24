@@ -57,6 +57,10 @@ object AppPrefs {
     fun setAutoBackupResult(ctx: Context, at: Long, error: String) =
         prefs(ctx).edit().putLong("auto_backup_at", at).putString("auto_backup_err", error).apply()
 
+    /** Otisk obsahu poslední automatické zálohy – beze změny dat se nová nevytváří. */
+    fun autoBackupDigest(ctx: Context): String = prefs(ctx).getString("auto_backup_digest", "") ?: ""
+    fun setAutoBackupDigest(ctx: Context, digest: String) = prefs(ctx).edit().putString("auto_backup_digest", digest).apply()
+
     fun lastBackupAt(ctx: Context): Long = prefs(ctx).getLong("last_backup_at", 0)
     fun setLastBackupAt(ctx: Context, at: Long) = prefs(ctx).edit().putLong("last_backup_at", at).apply()
 
