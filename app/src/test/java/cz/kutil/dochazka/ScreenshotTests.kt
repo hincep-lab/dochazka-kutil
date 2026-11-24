@@ -106,6 +106,14 @@ class ScreenshotTests {
     fun homeWorking() = home("01_prehled_v_praci", craftedState(open = true, pending = false))
 
     @Test
+    @Config(qualifiers = "w412dp-h1700dp-xxhdpi", fontScale = 1.3f)
+    fun homeWorkingBigFont() = home("09_prehled_velke_pismo", craftedState(open = true, pending = false))
+
+    @Test
+    @Config(qualifiers = "w360dp-h1700dp-xxhdpi")
+    fun homeWorkingNarrow() = home("10_prehled_uzky_displej", craftedState(open = true, pending = false))
+
+    @Test
     @Config(qualifiers = "w412dp-h1500dp-xxhdpi")
     fun homeIdle() = home("02_prehled_doma", craftedState(open = false, pending = false))
 

@@ -346,7 +346,8 @@ def value_noise(h, w, cell, seed):
 
 
 def background():
-    W, H = 1080, 2400
+    # 720×1600: na pozadí s šumem není rozdíl proti plnému rozlišení vidět, v paměti zabere méně než polovinu
+    W, H = 720, 1600
     yy, xx = np.mgrid[0:H, 0:W].astype(float)
     top = np.array([24, 50, 86]); bot = np.array([8, 18, 36])
     k = (yy / H)[..., None]
@@ -365,9 +366,9 @@ def background():
     col = col * v[..., None]
     col = grain(col, np.ones((H, W)), 3)
     alpha = np.ones((H, W))
-    col = droplets(col, alpha, 260, 3, 6, 21, 0.35)
-    col = droplets(col, alpha, 120, 6, 12, 22, 0.5)
-    col = droplets(col, alpha, 28, 12, 22, 23, 0.55)
+    col = droplets(col, alpha, 120, 2, 4, 21, 0.35)
+    col = droplets(col, alpha, 60, 4, 8, 22, 0.5)
+    col = droplets(col, alpha, 14, 8, 15, 23, 0.55)
     Image.fromarray(np.clip(col, 0, 255).astype(np.uint8)).save(os.path.join(OUT, 'bg_wet.webp'), 'WEBP', quality=80, method=6)
 
 

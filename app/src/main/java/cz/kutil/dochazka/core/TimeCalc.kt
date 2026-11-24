@@ -54,6 +54,7 @@ data class DayPiece(
 ) {
     fun startText(): String = fmtTime(start)
     fun endText(): String = if (endsAtMidnight) "24:00" else fmtTime(end)
+    fun interval(): Interval = Interval(startInstant, startInstant.plus(Duration.ofMinutes(minutes)))
 }
 
 fun fmtTime(t: LocalTime): String = "%02d:%02d".format(t.hour, t.minute)
@@ -192,8 +193,9 @@ object WorkCalc {
             DaySummary(
                 date = date,
                 pieces = pieces,
-                minutes = pieces.sumOf { it.minutes },
-                overtimeMinutes = if (dayFlags.isEmpty()) pieces.sumOf { overtimeOf(it) } else 0,
+                // Překrývající se záznamy (např. ručně přidaný výjezd uvnitř jiné směny) se počítají jen jednou.
+                minutes = unionMinutes(pieces.map { it.interval() }),
+                overtimeMinutes = if (dayFlags.isEmpty()) overtimeUnion(date, pieces, zone) else 0,
                 flags = dayFlags,
                 holidayName = CzechHolidays.name(date),
                 override = ov?.first,
@@ -201,6 +203,36 @@ object WorkCalc {
             )
         }
         return MonthSummary(month, days, days.sumOf { it.minutes }, days.sumOf { it.overtimeMinutes }, open)
+    }
+
+    /** Délka sjednocení intervalů v minutách – každá minuta se započítá nejvýš jednou. */
+    fun unionMinutes(intervals: List<Interval>): Long {
+        val sorted = intervals.filter { it.end.isAfter(it.start) }.sortedBy { it.start }
+        var total = 0L
+        var curStart: Instant? = null
+        var curEnd: Instant? = null
+        for (i in sorted) {
+            if (curEnd == null || i.start.isAfter(curEnd)) {
+                if (curStart != null && curEnd != null) total += Duration.between(curStart, curEnd).toMinutes()
+                curStart = i.start
+                curEnd = i.end
+            } else if (i.end.isAfter(curEnd)) {
+                curEnd = i.end
+            }
+        }
+        if (curStart != null && curEnd != null) total += Duration.between(curStart, curEnd).toMinutes()
+        return total
+    }
+
+    /** Přesčas dne (po 15:30) nad sjednocením intervalů – bez dvojího započtení. */
+    fun overtimeUnion(date: LocalDate, pieces: List<DayPiece>, zone: ZoneId = PRAGUE): Long {
+        val limit = date.atTime(OVERTIME_FROM).atZone(zone).toInstant()
+        return unionMinutes(
+            pieces.map { it.interval() }.mapNotNull { iv ->
+                val st = if (iv.start.isBefore(limit)) limit else iv.start
+                if (iv.end.isAfter(st)) Interval(st, iv.end) else null
+            },
+        )
     }
 
     /** Konec běžné pracovní doby v pracovní den; co je odpracováno později, je přesčas. */

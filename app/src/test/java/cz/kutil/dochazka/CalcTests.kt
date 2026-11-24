@@ -293,3 +293,62 @@ class AnomaliesTest {
         assertTrue(A.find(t(23, 10), listOf(shifts[3]), emptyMap<LocalDate, Any>(), 0, 12).none { it.kind == cz.kutil.dochazka.core.AnomalyKind.FORGOTTEN_END })
     }
 }
+
+/** Dvojí započítání, změna dne a letní/zimní čas. */
+class TimingTest {
+    @Test fun prekryvSePocitaJenJednou() {
+        val shifts = listOf(
+            ShiftData(1, t(2026, 11, 12, 7, 0), t(2026, 11, 12, 15, 30)),
+            // ručně přidaný výjezd, který leží uvnitř první směny
+            ShiftData(2, t(2026, 11, 12, 10, 0), t(2026, 11, 12, 12, 0)),
+            // částečný překryv na konci a přesah do přesčasu
+            ShiftData(3, t(2026, 11, 12, 15, 0), t(2026, 11, 12, 17, 0)),
+        )
+        val d = WorkCalc.month(YearMonth.of(2026, 11), shifts).day(12)
+        assertEquals(10 * 60L, d.minutes) // 7:00–17:00
+        assertEquals(90L, d.overtimeMinutes) // 15:30–17:00
+    }
+
+    @Test fun sjednoceniIntervalu() {
+        val a = t(2026, 11, 12, 8, 0)
+        val iv = listOf(
+            Interval(a, a.plusSeconds(3600)),
+            Interval(a.plusSeconds(1800), a.plusSeconds(5400)),
+            Interval(a.plusSeconds(7200), a.plusSeconds(9000)),
+            Interval(a.plusSeconds(9000), a.plusSeconds(9000)), // nulová délka
+        )
+        assertEquals(90L + 30L, WorkCalc.unionMinutes(iv))
+    }
+
+    @Test fun zimniCasPocitaSkutecneOdpracovanouDobu() {
+        // 25. 10. 2026 se v 3:00 vrací čas na 2:00 – noc 0:00–6:00 trvá 7 skutečných hodin
+        val start = LocalDateTime.of(2026, 10, 25, 0, 0).atZone(PRAGUE).toInstant()
+        val end = LocalDateTime.of(2026, 10, 25, 6, 0).atZone(PRAGUE).toInstant()
+        val d = WorkCalc.month(YearMonth.of(2026, 10), listOf(ShiftData(1, start, end))).day(25)
+        assertEquals(7 * 60L, d.minutes)
+    }
+
+    @Test fun letniCasPocitaSkutecneOdpracovanouDobu() {
+        // 29. 3. 2026 se ve 2:00 posouvá čas na 3:00 – noc 0:00–6:00 trvá 5 skutečných hodin
+        val start = LocalDateTime.of(2026, 3, 29, 0, 0).atZone(PRAGUE).toInstant()
+        val end = LocalDateTime.of(2026, 3, 29, 6, 0).atZone(PRAGUE).toInstant()
+        val d = WorkCalc.month(YearMonth.of(2026, 3), listOf(ShiftData(1, start, end))).day(29)
+        assertEquals(5 * 60L, d.minutes)
+    }
+
+    @Test fun smenaPresPulnocSeRozdeli() {
+        val shifts = listOf(ShiftData(1, t(2026, 11, 12, 22, 0), t(2026, 11, 13, 1, 30)))
+        val m = WorkCalc.month(YearMonth.of(2026, 11), shifts)
+        assertEquals(120L, m.day(12).minutes)
+        assertEquals(90L, m.day(13).minutes)
+        assertEquals("24:00", m.day(12).pieces.single().endText())
+    }
+
+    @Test fun zaokrouhleniPriZmeneCasu() {
+        // 2:14 letního času = 0:14 UTC; v noci změny 25. 10. 2026 je místní 2:14 dvakrát
+        val first = LocalDateTime.of(2026, 10, 25, 2, 14).atZone(PRAGUE).withEarlierOffsetAtOverlap().toInstant()
+        val second = LocalDateTime.of(2026, 10, 25, 2, 14).atZone(PRAGUE).withLaterOffsetAtOverlap().toInstant()
+        assertEquals(LocalDateTime.of(2026, 10, 25, 2, 0).atZone(PRAGUE).withEarlierOffsetAtOverlap().toInstant(), Rounding.roundToHalfHour(first))
+        assertEquals(LocalDateTime.of(2026, 10, 25, 2, 0).atZone(PRAGUE).withLaterOffsetAtOverlap().toInstant(), Rounding.roundToHalfHour(second))
+    }
+}

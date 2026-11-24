@@ -189,6 +189,13 @@ fun ShiftEditDialog(
         title = { Text(if (draft.id == null) "Přidat výjezd" else "Opravit čas") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (draft.id == null) {
+                    Text(
+                        "Přidá do dne další pracovní interval (např. výjezd k zákazníkovi). Ukládá se jen čas od–do, " +
+                            "žádné místo ani trasa. Stávající záznamy dne zůstanou, překrytý čas se do součtu nezapočítá dvakrát.",
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    )
+                }
                 OutlinedButton(onClick = { pickDate(context, date) { date = it } }, modifier = Modifier.fillMaxWidth()) {
                     Text("Den: ${Fmt.dowLong(date)} ${Fmt.date(date)}")
                 }

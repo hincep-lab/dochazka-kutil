@@ -36,6 +36,13 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -275,7 +282,7 @@ private val SteelEdge = Brush.verticalGradient(listOf(Color.White, Color(0xFFB4B
 @Composable
 fun SteelCard(
     modifier: Modifier = Modifier,
-    padding: Dp = 16.dp,
+    padding: Dp = 12.dp,
     screws: Boolean = false,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
@@ -300,7 +307,7 @@ fun SteelCard(
         OnSteel {
             Column(
                 Modifier.padding(horizontal = if (screws) padding + 4.dp else padding, vertical = padding),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
                 content = content,
             )
         }
@@ -309,18 +316,18 @@ fun SteelCard(
 
 /** Dřívější název – zachován kvůli ostatním obrazovkám. */
 @Composable
-fun MetalCard(modifier: Modifier = Modifier, padding: Dp = 16.dp, content: @Composable ColumnScope.() -> Unit) =
+fun MetalCard(modifier: Modifier = Modifier, padding: Dp = 14.dp, content: @Composable ColumnScope.() -> Unit) =
     SteelCard(modifier, padding, content = content)
 
 @Composable
 fun SectionTitle(text: String, icon: ImageVector? = null, @DrawableRes iconRes: Int? = null, trailing: (@Composable () -> Unit)? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         when {
-            iconRes != null -> Icon(painterResource(iconRes), null, tint = Ind.orangeDeep, modifier = Modifier.size(24.dp))
-            icon != null -> Icon(icon, null, tint = Ind.orangeDeep, modifier = Modifier.size(24.dp))
+            iconRes != null -> Icon(painterResource(iconRes), null, tint = Ind.orangeDeep, modifier = Modifier.size(22.dp))
+            icon != null -> Icon(icon, null, tint = Ind.orangeDeep, modifier = Modifier.size(22.dp))
         }
         if (icon != null || iconRes != null) Spacer(Modifier.width(8.dp))
-        Text(text, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, color = Ind.text, modifier = Modifier.weight(1f))
+        Text(text, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Ind.text, modifier = Modifier.weight(1f), maxLines = 2)
         trailing?.invoke()
     }
 }
@@ -364,8 +371,8 @@ fun StatusPanel(tone: PanelTone, modifier: Modifier = Modifier, content: @Compos
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(0f to Color.White.copy(alpha = 0.20f), 0.45f to Color.Transparent)))
             CompositionLocalProvider(LocalContentColor provides Color.White) {
                 Column(
-                    Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     content = content,
                 )
             }
@@ -395,7 +402,7 @@ fun BigActionButton(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     leading: (@Composable () -> Unit)? = null,
-    height: Dp = 62.dp,
+    height: Dp = 56.dp,
     enabled: Boolean = true,
     @DrawableRes iconRes: Int? = null,
     onClick: () -> Unit,
@@ -427,8 +434,8 @@ fun BigActionButton(
                     Spacer(Modifier.width(12.dp))
                 }
                 iconRes != null -> {
-                    Icon(painterResource(iconRes), null, tint = st.text, modifier = Modifier.size(24.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Icon(painterResource(iconRes), null, tint = st.text, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(7.dp))
                 }
                 icon != null -> {
                     Icon(icon, null, tint = st.text, modifier = Modifier.size(24.dp))
@@ -438,10 +445,11 @@ fun BigActionButton(
             Text(
                 text,
                 color = st.text,
-                fontSize = if (height >= 60.dp) 22.sp else 17.sp,
+                fontSize = if (height >= 56.dp) shrink(21f) else shrink(16f),
                 fontWeight = FontWeight.ExtraBold,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 style = if (kind == ActionKind.METAL || kind == ActionKind.ACCENT) TextStyle.Default else PanelText,
             )
         }
@@ -451,38 +459,49 @@ fun BigActionButton(
 /** Bílé kolečko s červeným čtverečkem (stop) – jako na předloze. */
 @Composable
 fun StopGlyph() {
-    Box(Modifier.size(34.dp).shadow(3.dp, CircleShape).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(13.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFFD72A20)))
+    Box(Modifier.size(30.dp).shadow(3.dp, CircleShape).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(12.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFFD72A20)))
     }
 }
 
 @Composable
 fun PlayGlyph() {
-    Box(Modifier.size(34.dp).shadow(3.dp, CircleShape).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-        Icon(painterResource(R.drawable.ic_play_arrow), null, tint = Color(0xFF2E9A35), modifier = Modifier.size(26.dp))
+    Box(Modifier.size(30.dp).shadow(3.dp, CircleShape).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+        Icon(painterResource(R.drawable.ic_play_arrow), null, tint = Color(0xFF2E9A35), modifier = Modifier.size(24.dp))
     }
 }
 
-/** Dlaždice rychlé akce s barevnou ikonou. */
+/** Dlaždice rychlé akce – všechny stejným stylem (ocelově modrá ikona, tmavý popisek). */
 @Composable
-fun QuickTile(text: String, @DrawableRes iconRes: Int, tint: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun QuickTile(text: String, @DrawableRes iconRes: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(14.dp)
+    val tint = Color(0xFF1F4E8C)
     Column(
         modifier
-            .heightIn(min = 92.dp)
+            .heightIn(min = 76.dp)
             .shadow(4.dp, shape)
             .clip(shape)
             .background(Brush.verticalGradient(listOf(Color(0xFFFBFCFE), Color(0xFFDCE3EC))))
             .border(1.dp, Color(0xFF9AA8BA), shape)
             .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 10.dp),
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(painterResource(iconRes), null, tint = tint, modifier = Modifier.size(34.dp))
-        Spacer(Modifier.height(4.dp))
-        Text(text, fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.Bold, color = Ind.text, textAlign = TextAlign.Center, maxLines = 2)
+        Icon(painterResource(iconRes), null, tint = tint, modifier = Modifier.size(28.dp))
+        Spacer(Modifier.height(3.dp))
+        Text(text, fontSize = shrink(13f), lineHeight = shrink(15f), fontWeight = FontWeight.Bold, color = Ind.text, textAlign = TextAlign.Center, maxLines = 2)
     }
+}
+
+/**
+ * Velikost písma, která při zvětšeném systémovém písmu roste jen mírně – aby se texty v tlačítkách
+ * a dlaždicích nevešly „…“ a zároveň zůstaly větší než při běžném nastavení.
+ */
+@Composable
+fun shrink(sp: Float): androidx.compose.ui.unit.TextUnit {
+    val fs = LocalDensity.current.fontScale
+    return if (fs <= 1.1f) sp.sp else (sp * 1.1f / fs).sp
 }
 
 @Composable
@@ -490,17 +509,47 @@ fun StatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 10.dp) {
     Box(modifier.size(size).clip(CircleShape).background(color).border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape))
 }
 
-/** Aktuální čas, který se sám obnovuje (živý časovač směny). */
+/**
+ * Aktuální čas pro živý časovač. Běží jen když je aplikace vidět (šetří baterii); po odemčení
+ * a návratu do aplikace se přepočítá okamžitě. Čas se vždy bere z hodin systému, takže
+ * odpracovaná doba nezávisí na tom, jak dlouho byla aplikace na pozadí.
+ */
 @Composable
 fun rememberNow(periodMs: Long = 1000L): Long {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(periodMs) {
-        while (true) {
-            now = System.currentTimeMillis()
-            delay(periodMs - now % periodMs)
+    val owner = LocalLifecycleOwner.current
+    LaunchedEffect(periodMs, owner) {
+        owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                now = System.currentTimeMillis()
+                delay(periodMs - now % periodMs + 5)
+            }
         }
     }
     return now
+}
+
+/** Počítadlo návratů do aplikace – klíč pro znovunačtení stavu ze systému. */
+@Composable
+fun rememberResumeTick(): Int {
+    var tick by remember { mutableIntStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { tick++ }
+    return tick
+}
+
+/** Jednotná sada ikon (Material „Round“) pro stejné funkce v celé aplikaci. */
+object AppIcons {
+    val HOME = R.drawable.ic_home
+    val CALENDAR = R.drawable.ic_calendar_month
+    val REPORT = R.drawable.ic_description
+    val CONFIRM = R.drawable.ic_task_alt
+    val MORE = R.drawable.ic_settings
+    val DAY_RECORD = R.drawable.ic_edit_note
+    val BACKUP = R.drawable.ic_backup
+    val SETTINGS = R.drawable.ic_settings
+    val TRIP = R.drawable.ic_local_shipping
+    val EDIT = R.drawable.ic_edit
+    val VACATION = R.drawable.ic_beach_access
 }
 
 /** "H:MM:SS" */

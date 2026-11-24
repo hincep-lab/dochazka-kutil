@@ -293,11 +293,11 @@ private fun IndBottomBar(selected: Tab?, pendingCount: Int, onSelect: (Tab) -> U
             for (t in Tab.entries) {
                 val sel = t == selected
                 val icon = when (t) {
-                    Tab.HOME -> R.drawable.ic_home
-                    Tab.CALENDAR -> R.drawable.ic_calendar_month
-                    Tab.MONTH -> R.drawable.ic_assignment
-                    Tab.PENDING -> R.drawable.ic_check_circle
-                    Tab.SETTINGS -> R.drawable.ic_more_horiz
+                    Tab.HOME -> AppIcons.HOME
+                    Tab.CALENDAR -> AppIcons.CALENDAR
+                    Tab.MONTH -> AppIcons.REPORT
+                    Tab.PENDING -> AppIcons.CONFIRM
+                    Tab.SETTINGS -> AppIcons.MORE
                 }
                 val shape = RoundedCornerShape(14.dp)
                 Column(

@@ -76,7 +76,7 @@ fun CalendarScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> 
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        MetalCard(padding = 12.dp) {
+        MetalCard(padding = 10.dp) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { vm.selectedMonth.value = ym.minusMonths(1) }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Předchozí měsíc", tint = Ind.text)
@@ -129,7 +129,7 @@ fun CalendarScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> 
         // --- vybraný den ---------------------------------------------------------------------
         val d = month.day(sel.dayOfMonth)
         MetalCard {
-            SectionTitle("${Fmt.dowLong(sel).replaceFirstChar { it.uppercase() }} ${Fmt.date(sel)}", Icons.Filled.DateRange) {
+            SectionTitle("${Fmt.dowLong(sel).replaceFirstChar { it.uppercase() }} ${Fmt.date(sel)}", iconRes = AppIcons.CALENDAR) {
                 Text("${WorkCalc.formatHm(d.minutes)} h", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ind.text)
             }
             d.holidayName?.let { Text("Státní svátek: $it", color = Ind.amberText, fontSize = 13.sp) }
@@ -157,8 +157,8 @@ fun CalendarScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> 
             }
             if (d.workLabels.isNotEmpty()) Text(d.workLabels.joinToString(" · "), color = Ind.amberText, fontSize = 13.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                BigActionButton("Upravit", ActionKind.ACCENT, Modifier.weight(1f), icon = Icons.Filled.Edit, height = 52.dp) { onOpenDay(sel) }
-                BigActionButton("Dovolená", ActionKind.METAL, Modifier.weight(1f), icon = Icons.Filled.Star, height = 52.dp) { vacationDialog = true }
+                BigActionButton("Upravit", ActionKind.ACCENT, Modifier.weight(1f), iconRes = AppIcons.EDIT, height = 50.dp) { onOpenDay(sel) }
+                BigActionButton("Dovolená", ActionKind.METAL, Modifier.weight(1f), iconRes = AppIcons.VACATION, height = 50.dp) { vacationDialog = true }
             }
             Text(
                 "Nemoc, lékař, náhradní volno a další nepřítomnosti zadáš v detailu dne (Upravit / doplnit → Označení dne).",
