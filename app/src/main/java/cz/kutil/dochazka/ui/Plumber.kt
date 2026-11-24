@@ -484,7 +484,7 @@ private fun poseToilet(e: Float, t: Float, tx: Float, w: Float, u: Float): Pose 
 // Póza postavičky v čase scénky
 // ---------------------------------------------------------------------------------------------
 
-private class Pose(
+internal class Pose(
     val x: Float,
     val facing: Float, // 1 = doprava, -1 = doleva
     val run: Float, // 0..1 intenzita běhu
@@ -630,11 +630,11 @@ private val Hair = Color(0xFF3A2418)
 private val Ink = Color(0xFF1B1410)
 
 /** Plynulý přechod mezi pózami: každá hodnota se k cílové blíží tlumeně (žádné skoky). */
-class PoseSmoother {
+internal class PoseSmoother {
     private var cur: FloatArray? = null
     private var lastT = 0f
     private var lastE = -10f
-    fun smooth(target: Pose, t: Float, e: Float): Pose {
+    internal fun smooth(target: Pose, t: Float, e: Float): Pose {
         val v = floatArrayOf(target.x, target.armR, target.armL, target.lean, target.tilt, target.sit, target.capLift, target.capSpin, target.run, target.plungeDy, target.dazed, target.grin)
         val c = cur
         if (c == null || e < lastE || e - lastE > 0.5f) {
