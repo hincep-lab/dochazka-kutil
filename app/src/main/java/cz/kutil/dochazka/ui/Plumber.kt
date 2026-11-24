@@ -718,23 +718,23 @@ private fun DrawScope.drawPlumber(p: Pose, floorY: Float, u: Float) {
                     // ---------- zadní ruka (za tělem)
                     drawArmLimb(Offset(-6 * u, -54 * u), p.armL, u, back = true, p = p)
                     // ---------- tělo: hruškovitý trup s bříškem dopředu
-                    val bx = 25 * u * breathe + jiggle
+                    val bx = 32 * u * breathe + jiggle // pořádné bříško
                     val torso = Path().apply {
                         moveTo(-9 * u, -60 * u)
                         cubicTo(2 * u, -64 * u, 12 * u, -61 * u, 14 * u, -55 * u)
                         cubicTo(bx, -48 * u, bx + 2 * u, -30 * u, 14 * u, -21 * u)
-                        cubicTo(6 * u, -16 * u, -10 * u, -16 * u, -15 * u, -22 * u)
-                        cubicTo(-20 * u, -30 * u, -19 * u, -50 * u, -9 * u, -60 * u)
+                        cubicTo(6 * u, -15 * u, -12 * u, -15 * u, -19 * u, -22 * u)
+                        cubicTo(-25 * u, -30 * u, -22 * u, -50 * u, -9 * u, -60 * u)
                         close()
                     }
                     outlined(torso, Brush.radialGradient(listOf(Shirt, ShirtShade), center = Offset(2 * u, -54 * u), radius = 26 * u), u)
                     // lacláče – spodní část trupu + náprsenka
                     val pants = Path().apply {
-                        moveTo(-16 * u, -40 * u)
+                        moveTo(-21 * u, -40 * u)
                         cubicTo(-6 * u, -43 * u, 8 * u, -44 * u, bx - 2 * u, -42 * u)
                         cubicTo(bx + 2 * u, -32 * u, 20 * u, -22 * u, 14 * u, -21 * u)
-                        cubicTo(6 * u, -16 * u, -10 * u, -16 * u, -15 * u, -22 * u)
-                        cubicTo(-18 * u, -27 * u, -18 * u, -35 * u, -16 * u, -40 * u)
+                        cubicTo(6 * u, -15 * u, -12 * u, -15 * u, -19 * u, -22 * u)
+                        cubicTo(-23 * u, -27 * u, -23 * u, -35 * u, -21 * u, -40 * u)
                         close()
                     }
                     outlined(pants, Brush.radialGradient(listOf(Color(0xFF5B92E8), Overalls, OverallsShade), center = Offset(8 * u, -38 * u), radius = 28 * u), u)
