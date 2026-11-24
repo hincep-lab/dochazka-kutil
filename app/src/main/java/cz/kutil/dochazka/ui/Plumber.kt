@@ -41,7 +41,7 @@ import kotlin.math.sin
 // Vše se kreslí v Compose, žádné obrázky. Čistě pro radost – s docházkou nijak nesouvisí.
 // =============================================================================================
 
-private object T {
+internal object T {
     const val RUN_IN = 0.6f
     const val ARRIVE = 3.4f
     const val PEEK = 4.4f
@@ -61,13 +61,13 @@ private object T {
 }
 
 /** Zvukové okamžiky scénky (čas od začátku → zvuk). */
-enum class GagSound { BURST_START, BURST_STOP, SPLASH, CLANK, BOING, THUD, PLOP, GURGLE, POP, FLUSH }
+enum class GagSound { BURST_START, BURST_STOP, SPLASH, CLANK, BOING, THUD, PLOP, GURGLE, POP, FLUSH, SNORE, SQUEAK }
 
 /** Scénky se střídají. */
 enum class GagScene { PIPE, TOILET }
 
 /** Ucpaný záchod. */
-private object T2 {
+internal object T2 {
     const val RUN_IN = 0.6f
     const val ARRIVE = 3.2f
     const val PEEK = 4.0f
@@ -83,7 +83,7 @@ private object T2 {
     const val END = 17.5f
 }
 
-private val TOILET_EVENTS = listOf(
+internal val TOILET_EVENTS = listOf(
     0.05f to GagSound.GURGLE,
     T2.PLOPS[0] to GagSound.PLOP, T2.PLOPS[1] to GagSound.PLOP, T2.PLOPS[2] to GagSound.PLOP,
     T2.PLOPS[3] to GagSound.PLOP, T2.PLOPS[4] to GagSound.PLOP,
@@ -95,9 +95,9 @@ private val TOILET_EVENTS = listOf(
     T2.SCARE + 0.1f to GagSound.BOING,
 )
 
-private fun endOf(scene: GagScene) = if (scene == GagScene.PIPE) T.END else T2.END
+internal fun endOf(scene: GagScene) = if (scene == GagScene.PIPE) T.END else T2.END
 
-private val GAG_EVENTS = listOf(
+internal val GAG_EVENTS = listOf(
     0.05f to GagSound.BURST_START,
     T.SPLASH to GagSound.SPLASH,
     T.HITS[0] to GagSound.CLANK, T.HITS[1] to GagSound.CLANK, T.HITS[2] to GagSound.CLANK,
@@ -174,11 +174,11 @@ fun PlumberWorkshop(
 
 // ---------------------------------------------------------------------------------------------
 
-private fun lerp(a: Float, b: Float, k: Float) = a + (b - a) * k.coerceIn(0f, 1f)
-private fun seg(e: Float, a: Float, b: Float) = ((e - a) / (b - a)).coerceIn(0f, 1f)
-private fun ease(k: Float) = k * k * (3 - 2 * k)
+internal fun lerp(a: Float, b: Float, k: Float) = a + (b - a) * k.coerceIn(0f, 1f)
+internal fun seg(e: Float, a: Float, b: Float) = ((e - a) / (b - a)).coerceIn(0f, 1f)
+internal fun ease(k: Float) = k * k * (3 - 2 * k)
 
-private fun sprayLevel(e: Float): Float = when {
+internal fun sprayLevel(e: Float): Float = when {
     e < 0f || e > T.END -> 0f
     e < T.HITS[0] -> min(1f, e / 0.2f) * 0.9f
     e < T.HITS[1] -> 1.2f
@@ -188,7 +188,7 @@ private fun sprayLevel(e: Float): Float = when {
     else -> 0f
 }
 
-private fun DrawScope.drawWorkshop(e: Float, t: Float, water: WaterState, pipes: PipeImages, scene: GagScene, smoother: PoseSmoother) {
+internal fun DrawScope.drawWorkshop(e: Float, t: Float, water: WaterState, pipes: PipeImages, scene: GagScene, smoother: PoseSmoother) {
     val w = size.width
     val h = size.height
     val u = 1.dp.toPx()
@@ -272,7 +272,7 @@ private fun DrawScope.drawWorkshop(e: Float, t: Float, water: WaterState, pipes:
     }
 }
 
-private fun DrawScope.drawSpray(o: Offset, s: Float, t: Float, floorY: Float, u: Float) {
+internal fun DrawScope.drawSpray(o: Offset, s: Float, t: Float, floorY: Float, u: Float) {
     // soustředěný proud šikmo doleva dolů (tam, kde stojí Kutil) + pár odletujících kapek
     val g = 900f * u
     val jets = listOf(-1f to 1f, -0.82f to 0.75f, -1.18f to 0.55f)
@@ -322,7 +322,7 @@ private fun DrawScope.drawSpray(o: Offset, s: Float, t: Float, floorY: Float, u:
 // Scénka 2: ucpaný záchod a zvon
 // ---------------------------------------------------------------------------------------------
 
-private fun DrawScope.drawToiletScene(e: Float, t: Float, floorY: Float, pipeY: Float, w: Float, u: Float, smoother: PoseSmoother) {
+internal fun DrawScope.drawToiletScene(e: Float, t: Float, floorY: Float, pipeY: Float, w: Float, u: Float, smoother: PoseSmoother) {
     val tx = w * 0.60f
     val rimY = floorY - 40 * u
     val bowlC = Offset(tx - 10 * u, rimY)
@@ -365,9 +365,9 @@ private fun DrawScope.drawToiletScene(e: Float, t: Float, floorY: Float, pipeY: 
     if (e in 0f..T2.END) drawPlumber(smoother.smooth(poseToilet(e, t, tx, w, u), t, e), floorY, u)
 }
 
-private fun max0(v: Float) = if (v < 0f) 0f else v
+internal fun max0(v: Float) = if (v < 0f) 0f else v
 
-private fun DrawScope.drawToilet(tx: Float, floorY: Float, u: Float, lidUp: Boolean) {
+internal fun DrawScope.drawToilet(tx: Float, floorY: Float, u: Float, lidUp: Boolean) {
     val white = Brush.horizontalGradient(listOf(Color(0xFFDCE6F0), Color.White, Color(0xFFB8C6D4)))
     // nádržka
     drawRoundRect(white, Offset(tx + 4 * u, floorY - 76 * u), Size(26 * u, 36 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(4 * u))
@@ -393,7 +393,7 @@ private fun DrawScope.drawToilet(tx: Float, floorY: Float, u: Float, lidUp: Bool
     drawRoundRect(Color(0xFFEFF3F7), Offset(tx - 32 * u, floorY - 45 * u), Size(42 * u, 4 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
 }
 
-private fun poseToilet(e: Float, t: Float, tx: Float, w: Float, u: Float): Pose {
+internal fun poseToilet(e: Float, t: Float, tx: Float, w: Float, u: Float): Pose {
     val standX = tx - 58 * u
     var x = standX
     var run = 0f
@@ -506,9 +506,15 @@ internal class Pose(
     val plunger: Boolean = false,
     val plungerOnFace: Boolean = false,
     val plungeDy: Float = 0f,
+    /** Zvednutí nad podlahu v px (štafle, ležení). */
+    val lift: Float = 0f,
+    /** Co drží v ruce navíc: 0 nic, 1 štafle, 2 kachnička. */
+    val carry: Int = 0,
+    val zzz: Boolean = false,
+    val noTool: Boolean = false,
 )
 
-private fun poseAt(e: Float, t: Float, crackX: Float, w: Float, u: Float): Pose {
+internal fun poseAt(e: Float, t: Float, crackX: Float, w: Float, u: Float): Pose {
     val standX = crackX - 30 * u
     var x = standX
     var facing = 1f
@@ -615,19 +621,19 @@ private fun poseAt(e: Float, t: Float, crackX: Float, w: Float, u: Float): Pose 
 // ---------------------------------------------------------------------------------------------
 
 // Paleta – jednotný kreslený styl: plné barvy, měkké stínování, tmavá obrysová linka.
-private val Outline = Color(0xFF241A14)
-private val Skin = Color(0xFFF4C29A)
-private val SkinShade = Color(0xFFD99670)
-private val Overalls = Color(0xFF3473D1)
-private val OverallsShade = Color(0xFF1F4C93)
-private val Shirt = Color(0xFF8FAE98)
-private val ShirtShade = Color(0xFF5F7F69)
-private val Cap = Color(0xFFF2922A)
-private val CapShade = Color(0xFFBF6410)
-private val Boot = Color(0xFF6B4428)
-private val BootShade = Color(0xFF3E2716)
-private val Hair = Color(0xFF3A2418)
-private val Ink = Color(0xFF1B1410)
+internal val Outline = Color(0xFF241A14)
+internal val Skin = Color(0xFFF4C29A)
+internal val SkinShade = Color(0xFFD99670)
+internal val Overalls = Color(0xFF3473D1)
+internal val OverallsShade = Color(0xFF1F4C93)
+internal val Shirt = Color(0xFF8FAE98)
+internal val ShirtShade = Color(0xFF5F7F69)
+internal val Cap = Color(0xFFF2922A)
+internal val CapShade = Color(0xFFBF6410)
+internal val Boot = Color(0xFF6B4428)
+internal val BootShade = Color(0xFF3E2716)
+internal val Hair = Color(0xFF3A2418)
+internal val Ink = Color(0xFF1B1410)
 
 /** Plynulý přechod mezi pózami: každá hodnota se k cílové blíží tlumeně (žádné skoky). */
 internal class PoseSmoother {
@@ -635,7 +641,7 @@ internal class PoseSmoother {
     private var lastT = 0f
     private var lastE = -10f
     internal fun smooth(target: Pose, t: Float, e: Float): Pose {
-        val v = floatArrayOf(target.x, target.armR, target.armL, target.lean, target.tilt, target.sit, target.capLift, target.capSpin, target.run, target.plungeDy, target.dazed, target.grin)
+        val v = floatArrayOf(target.x, target.armR, target.armL, target.lean, target.tilt, target.sit, target.capLift, target.capSpin, target.run, target.plungeDy, target.dazed, target.grin, target.lift)
         val c = cur
         if (c == null || e < lastE || e - lastE > 0.5f) {
             cur = v; lastT = t; lastE = e
@@ -646,23 +652,24 @@ internal class PoseSmoother {
         val kFast = 1f - kotlin.math.exp(-dt * 22f)
         val kSlow = 1f - kotlin.math.exp(-dt * 11f)
         for (i in v.indices) {
-            val k = if (i == 0 || i == 6 || i == 7 || i == 9) kFast else kSlow
+            val k = if (i == 0 || i == 6 || i == 7 || i == 9 || i == 12) kFast else kSlow
             c[i] += (v[i] - c[i]) * k
         }
         return Pose(
             c[0], target.facing, c[8], target.stride, c[1], c[2], c[3], c[4], c[5], c[6], c[7], target.wet, c[10], c[11],
             target.wink, target.thumb, target.tape, target.eyesClosed, target.plunger, target.plungerOnFace, c[9],
+            c[12], target.carry, target.zzz, target.noTool,
         )
     }
 }
 
-private fun DrawScope.outlined(path: Path, fill: Brush, u: Float, w: Float = 1.6f) {
+internal fun DrawScope.outlined(path: Path, fill: Brush, u: Float, w: Float = 1.6f) {
     drawPath(path, fill)
     drawPath(path, Outline, style = Stroke(w * u, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
 }
 
 /** Končetina jako zaoblený „rukáv“ s obrysem (dva úseky přes koleno / loket). */
-private fun DrawScope.limb(a: Offset, b: Offset, c: Offset, width: Float, fill: Color, shade: Color, u: Float) {
+internal fun DrawScope.limb(a: Offset, b: Offset, c: Offset, width: Float, fill: Color, shade: Color, u: Float) {
     val path = Path().apply { moveTo(a.x, a.y); lineTo(b.x, b.y); lineTo(c.x, c.y) }
     drawPath(path, Outline, style = Stroke(width + 3.2f * u, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
     drawPath(path, fill, style = Stroke(width, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
@@ -672,21 +679,22 @@ private fun DrawScope.limb(a: Offset, b: Offset, c: Offset, width: Float, fill: 
     drawPath(sh, shade.copy(alpha = 0.55f), style = Stroke(width * 0.45f, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
 }
 
-private fun polar(o: Offset, len: Float, deg: Float): Offset {
+internal fun polar(o: Offset, len: Float, deg: Float): Offset {
     val r = Math.toRadians(deg.toDouble())
     // 0° = dolů, kladné = dopředu (doprava)
     return Offset(o.x + (len * sin(r)).toFloat(), o.y + (len * cos(r)).toFloat())
 }
 
-private fun DrawScope.drawPlumber(p: Pose, floorY: Float, u: Float) {
+internal fun DrawScope.drawPlumber(p: Pose, floorY: Float, u: Float) {
     val t = p.stride / 14f
     val runCycle = p.stride * 0.95f
     val bob = abs(sin(runCycle)) * 3.2f * u * p.run
     val breathe = 1f + 0.025f * sin(t * 2.2f)
     val jiggle = sin(runCycle * 2f - 0.6f) * 2.2f * u * p.run + sin(t * 2.2f) * 0.4f * u
-    translate(p.x, floorY - bob + p.sit * 12 * u) {
-        // měkký stín na podlaze
-        drawOval(Brush.radialGradient(listOf(Color(0x66000000), Color.Transparent), center = Offset(0f, bob), radius = 26 * u), Offset(-26 * u, -4 * u + bob), Size(52 * u, 8 * u))
+    // měkký stín na podlaze (zůstává na zemi i když je Kutil na štaflích)
+    val shK = (1f - (p.lift / (90 * u)).coerceIn(0f, 0.7f))
+    drawOval(Brush.radialGradient(listOf(Color(0x66000000), Color.Transparent), center = Offset(p.x, floorY), radius = 26 * u * shK), Offset(p.x - 26 * u * shK, floorY - 4 * u), Size(52 * u * shK, 8 * u))
+    translate(p.x, floorY - bob + p.sit * 12 * u - p.lift) {
         scale(p.facing, 1f, pivot = Offset.Zero) {
             rotate(p.tilt + 7f * p.run, pivot = Offset(0f, -12 * u)) {
                 // ---------- nohy (stehno + lýtko, koleno se při běhu ohýbá)
@@ -783,6 +791,14 @@ private fun DrawScope.drawPlumber(p: Pose, floorY: Float, u: Float) {
         if (p.capLift > 0.5f) {
             rotate(p.capSpin, pivot = Offset(4 * u, -92 * u - p.capLift)) { drawPlumberCap(Offset(4 * u, -90 * u - p.capLift), u) }
         }
+        if (p.carry == 1) drawCarriedLadder(p.facing, u)
+        if (p.carry == 2) drawDuck(Offset(16 * u * p.facing, -46 * u), 0.9f * u, p.facing)
+        if (p.zzz) {
+            for (i in 0 until 3) {
+                val q = ((t * 0.45f + i / 3f) % 1f)
+                drawZ(Offset(30 * u + 14 * u * q + i * 2 * u, -60 * u - 40 * u * q), (4f + 4f * q) * u, Color.White.copy(alpha = 0.85f * (1f - q)))
+            }
+        }
         if (p.dazed > 0.05f) {
             for (i in 0 until 3) {
                 val a = t * 5f + i * 2.1f
@@ -793,7 +809,7 @@ private fun DrawScope.drawPlumber(p: Pose, floorY: Float, u: Float) {
     }
 }
 
-private fun DrawScope.drawArmLimb(sh: Offset, angle: Float, u: Float, back: Boolean, p: Pose) {
+internal fun DrawScope.drawArmLimb(sh: Offset, angle: Float, u: Float, back: Boolean, p: Pose) {
     // loket se přirozeně ohýbá víc, když je ruka nahoře
     val elbowBend = 25f + 35f * (abs(angle) / 180f)
     val el = polar(sh, 10 * u, angle)
@@ -820,7 +836,7 @@ private fun DrawScope.drawArmLimb(sh: Offset, angle: Float, u: Float, back: Bool
         }
         if (!back) {
             val tip = Offset(wr.x, wr.y + 4 * u)
-            val wrench = !p.thumb && !p.tape && !p.plunger && !p.plungerOnFace
+            val wrench = !p.thumb && !p.tape && !p.plunger && !p.plungerOnFace && !p.noTool
             if (wrench) {
                 drawLine(Outline, tip, Offset(tip.x, tip.y + 17 * u), strokeWidth = 5f * u, cap = StrokeCap.Round)
                 drawLine(Color(0xFFD63A2F), tip, Offset(tip.x, tip.y + 8 * u), strokeWidth = 3.4f * u, cap = StrokeCap.Round)
@@ -853,7 +869,7 @@ private fun DrawScope.drawArmLimb(sh: Offset, angle: Float, u: Float, back: Bool
     }
 }
 
-private fun DrawScope.drawPlumberHead(c: Offset, p: Pose, u: Float, t: Float) {
+internal fun DrawScope.drawPlumberHead(c: Offset, p: Pose, u: Float, t: Float) {
     // krk / podbradek, ucho, hlava s tvářemi
     val head = Path().apply {
         moveTo(c.x - 12 * u, c.y - 4 * u)
@@ -980,7 +996,7 @@ private fun DrawScope.drawPlumberHead(c: Offset, p: Pose, u: Float, t: Float) {
     }
 }
 
-private fun DrawScope.drawPlumberCap(c: Offset, u: Float) {
+internal fun DrawScope.drawPlumberCap(c: Offset, u: Float) {
     val dome = Path().apply {
         moveTo(c.x - 13 * u, c.y + 3 * u)
         cubicTo(c.x - 14 * u, c.y - 10 * u, c.x + 12 * u, c.y - 12 * u, c.x + 13 * u, c.y + 2 * u)
@@ -1007,7 +1023,7 @@ private fun DrawScope.drawPlumberCap(c: Offset, u: Float) {
     drawArc(Color(0x66FFFFFF), 200f, 70f, false, Offset(c.x - 10 * u, c.y - 9 * u), Size(16 * u, 12 * u), style = Stroke(1.5f * u, cap = StrokeCap.Round))
 }
 
-private fun DrawScope.drawStar(c: Offset, r: Float, color: Color) {
+internal fun DrawScope.drawStar(c: Offset, r: Float, color: Color) {
     val path = Path()
     for (i in 0 until 10) {
         val a = -PI / 2 + i * PI / 5

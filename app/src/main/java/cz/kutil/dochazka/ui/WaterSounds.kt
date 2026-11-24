@@ -46,6 +46,8 @@ class WaterSounds(ctx: Context) {
     private val gurgle = pool.load(ctx, R.raw.gag_gurgle, 1)
     private val popS = pool.load(ctx, R.raw.gag_pop, 1)
     private val flush = pool.load(ctx, R.raw.gag_flush, 1)
+    private val squeak = pool.load(ctx, R.raw.gag_squeak, 1)
+    private val snore = pool.load(ctx, R.raw.gag_snore, 1)
     private var overflowStream = 0
     private var sprayStream = 0
 
@@ -55,16 +57,18 @@ class WaterSounds(ctx: Context) {
             stopSpray(); return
         }
         when (s) {
-            GagSound.BURST_START -> if (sprayStream == 0) sprayStream = pool.play(spray, 0.3f, 0.3f, 0, -1, 1f)
+            GagSound.BURST_START -> if (sprayStream == 0) sprayStream = pool.play(spray, 0.14f, 0.14f, 0, -1, 1f)
             GagSound.BURST_STOP -> stopSpray()
-            GagSound.SPLASH -> pool.play(splash, 0.5f, 0.5f, 1, 0, 1f)
-            GagSound.CLANK -> pool.play(clank, 0.45f, 0.45f, 1, 0, 0.95f + Math.random().toFloat() * 0.1f)
-            GagSound.BOING -> pool.play(boing, 0.45f, 0.45f, 1, 0, 1f)
-            GagSound.THUD -> pool.play(thud, 0.5f, 0.5f, 1, 0, 1f)
-            GagSound.PLOP -> pool.play(plop, 0.5f, 0.5f, 1, 0, 0.9f + Math.random().toFloat() * 0.2f)
-            GagSound.GURGLE -> pool.play(gurgle, 0.45f, 0.45f, 1, 0, 1f)
-            GagSound.POP -> pool.play(popS, 0.55f, 0.55f, 1, 0, 1f)
-            GagSound.FLUSH -> pool.play(flush, 0.45f, 0.45f, 1, 0, 1f)
+            GagSound.SPLASH -> pool.play(splash, 0.23f, 0.23f, 1, 0, 1f)
+            GagSound.CLANK -> pool.play(clank, 0.20f, 0.20f, 1, 0, 0.95f + Math.random().toFloat() * 0.1f)
+            GagSound.BOING -> pool.play(boing, 0.20f, 0.20f, 1, 0, 1f)
+            GagSound.THUD -> pool.play(thud, 0.23f, 0.23f, 1, 0, 1f)
+            GagSound.PLOP -> pool.play(plop, 0.23f, 0.23f, 1, 0, 0.9f + Math.random().toFloat() * 0.2f)
+            GagSound.GURGLE -> pool.play(gurgle, 0.20f, 0.20f, 1, 0, 1f)
+            GagSound.POP -> pool.play(popS, 0.25f, 0.25f, 1, 0, 1f)
+            GagSound.SQUEAK -> pool.play(squeak, 0.22f, 0.22f, 1, 0, 1f)
+            GagSound.SNORE -> pool.play(snore, 0.25f, 0.25f, 1, 0, 1f)
+            GagSound.FLUSH -> pool.play(flush, 0.20f, 0.20f, 1, 0, 1f)
         }
     }
 
@@ -75,12 +79,12 @@ class WaterSounds(ctx: Context) {
     private fun allowed() = audio.ringerMode == AudioManager.RINGER_MODE_NORMAL
 
     fun drip() {
-        if (allowed()) pool.play(drip, 0.35f, 0.35f, 1, 0, 0.96f + Math.random().toFloat() * 0.08f)
+        if (allowed()) pool.play(drip, 0.22f, 0.22f, 1, 0, 0.96f + Math.random().toFloat() * 0.08f)
     }
 
     fun overflow(on: Boolean) {
         if (on && allowed()) {
-            if (overflowStream == 0) overflowStream = pool.play(overflow, 0.22f, 0.22f, 0, -1, 1f)
+            if (overflowStream == 0) overflowStream = pool.play(overflow, 0.14f, 0.14f, 0, -1, 1f)
         } else if (overflowStream != 0) {
             pool.stop(overflowStream)
             overflowStream = 0

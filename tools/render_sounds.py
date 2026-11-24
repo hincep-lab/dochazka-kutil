@@ -170,8 +170,36 @@ def flush():
     save('gag_flush', x, -10)
 
 
+def squeak():
+    total = 0.45
+    n = int(total * SR); t = np.arange(n) / SR
+    f = 1250 + 500 * np.sin(np.pi * np.clip(t / 0.32, 0, 1))
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    buzz = np.sign(np.sin(ph)) * 0.35 + np.sin(ph) * 0.65  # gumové „píí“
+    x = buzz * np.minimum(1, t / 0.02) * np.exp(-np.maximum(0, t - 0.28) / 0.05)
+    save('gag_squeak', x, -14)
+
+
+def snore():
+    total = 1.6
+    n = int(total * SR); t = np.arange(n) / SR
+    noise = rng.normal(0, 1, n)
+    spec = np.fft.rfft(noise); f = np.fft.rfftfreq(n, 1 / SR)
+    band = np.exp(-((np.log(f + 1) - np.log(180)) ** 2) / (2 * 0.5 ** 2))
+    x = np.fft.irfft(spec * band, n)
+    x /= np.max(np.abs(x))
+    env = np.sin(np.pi * np.clip(t / 1.1, 0, 1)) ** 2
+    rattle = 0.6 + 0.4 * np.sign(np.sin(2 * np.pi * 32 * t))
+    x = x * env * rattle
+    # krátké „pf“ výdechu
+    x += rng.normal(0, 1, n) * np.exp(-((t - 1.3) / 0.08) ** 2) * 0.15
+    save('gag_snore', x, -16)
+
+
 drip()
 overflow()
+squeak()
+snore()
 plop()
 gurgle()
 pop()

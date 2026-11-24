@@ -365,11 +365,16 @@ fun HomeScreen(
                 Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = "Stav sledování", tint = Ind.onBgDim)
             }
         }
-        if (gagOn) {
-            PlumberWorkshop(clock, water, animate, working = open != null, onSound = { sounds?.gag(it) })
-        } else {
-            AnimatedDrain(clock, water, animate)
-        }
+        AnimatedDrain(clock, water, animate)
+        // místo dole, aby šel obsah odrolovat nad Kutilovo jeviště
+        if (gagOn) Spacer(Modifier.height(StageHeight - 40.dp))
+    }
+    // Kutil sám chodí po spodní části přehledu a střídá scénky (doteky propouští k tlačítkům)
+    if (gagOn) {
+        PlumberStage(
+            clock, water, animate, onSound = { sounds?.gag(it) },
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(StageHeight),
+        )
     }
     }
 

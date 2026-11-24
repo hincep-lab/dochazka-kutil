@@ -8,6 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
@@ -169,6 +171,40 @@ class ScreenshotTests {
             }
         }
     }
+
+    private fun stage(name: String, act: cz.kutil.dochazka.ui.Act, times: List<Float>) {
+        shoot(name) {
+            Box(Modifier.fillMaxSize()) {
+                WetBackground()
+                androidx.compose.foundation.layout.Column {
+                    val clock = androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(37.3f) }
+                    for (e in times) {
+                        cz.kutil.dochazka.ui.PlumberStage(
+                            clock, cz.kutil.dochazka.ui.WaterState(1f, 0f), animate = true, onSound = {},
+                            modifier = Modifier.fillMaxWidth().height(cz.kutil.dochazka.ui.StageHeight),
+                            fixedAct = act, fixedElapsed = e,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageLadder() = stage("15_stafle", cz.kutil.dochazka.ui.Act.LADDER, listOf(2f, 5.5f, 8f, 10.2f, 11.8f, 13.4f, 15f, 16.5f, 17f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageSink() = stage("16_drez", cz.kutil.dochazka.ui.Act.SINK, listOf(2f, 4.6f, 7f, 10.3f, 11.2f, 12.5f, 13.6f, 15f, 16f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageTub() = stage("17_vana", cz.kutil.dochazka.ui.Act.TUB, listOf(2f, 3.8f, 6f, 10f, 12.15f, 12.6f, 13.6f, 14.8f, 16.5f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageWander() = stage("18_prochazka", cz.kutil.dochazka.ui.Act.WANDER, listOf(2f, 5f, 8f))
 
     /** Celá aplikace s lištami nad ukázkovými daty (demo režim). */
     private fun app(name: String, tab: String?) {
