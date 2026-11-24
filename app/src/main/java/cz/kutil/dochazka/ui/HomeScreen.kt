@@ -133,7 +133,6 @@ fun HomeScreen(
     val soundsOn = animate && remember(resumeTick) { soundsEnabled(context) }
     val sounds = rememberWaterSounds(soundsOn)
     val gagOn = animate && remember(resumeTick) { AppPrefs.plumberGag(context) }
-    PlumberDebug.log?.invoke("home animate=$animate sounds=$soundsOn gag=$gagOn")
     val reportStart = open?.let { it.editedStart ?: Rounding.roundToHalfHour(Instant.ofEpochMilli(it.rawStart)).toEpochMilli() }
     val worked = reportStart?.let { now - it } ?: 0L
     val runStart = reportStart

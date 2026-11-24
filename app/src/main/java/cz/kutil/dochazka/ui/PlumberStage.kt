@@ -74,7 +74,8 @@ private fun eventsOf(a: Act): List<Pair<Float, GagSound>> = when (a) {
 /** Jen pro natáčení ukázkového videa v testech: pevné pořadí scének bez procházek. */
 object PlumberDebug {
     @Volatile var forcedOrder: List<Act>? = null
-    @Volatile var log: ((String) -> Unit)? = null
+    /** Scénář pro natáčení: čas → (scénka, čas od jejího začátku). */
+    @Volatile var script: ((Float) -> Pair<Act, Float>?)? = null
 }
 
 /** Výška jeviště (spodní část přehledu). */
@@ -100,7 +101,6 @@ fun PlumberStage(
     val smoother = remember { PoseSmoother() }
     // režisér: scénky se střídají samy, mezi nimi se Kutil občas jen projde
     LaunchedEffect(animate, fixedAct, working, night) {
-        PlumberDebug.log?.invoke("director animate=$animate working=$working night=$night clock=${clock.value}")
         if (!animate || fixedAct != null) return@LaunchedEffect
         if (!working && PlumberDebug.forcedOrder == null) {
             // po práci: televize a pivo, v noci spánek – běží ve smyčce
@@ -123,7 +123,6 @@ fun PlumberStage(
             }
             sinceScene = if (next == Act.WANDER) 1 else 0
             act.intValue = next.ordinal
-            PlumberDebug.log?.invoke("act $next at $t")
             variant.intValue = (Math.random() * 3).toInt()
             start.floatValue = t
             nextAt = t + next.length + if (forced != null) 1f else 3f + (Math.random() * 6).toFloat()
@@ -145,8 +144,10 @@ fun PlumberStage(
     val pipes = rememberPipeImages()
     Canvas(modifier) {
         val t = clock.value
-        val a = fixedAct ?: Act.entries[act.intValue]
-        var e = fixedElapsed ?: if (animate) t - start.floatValue else -1f
+        val scripted = PlumberDebug.script?.invoke(t)
+        if (PlumberDebug.script != null && scripted == null) return@Canvas
+        val a = scripted?.first ?: fixedAct ?: Act.entries[act.intValue]
+        var e = scripted?.second ?: fixedElapsed ?: if (animate) t - start.floatValue else -1f
         val looping = a == Act.TV || a == Act.SLEEP
         if (looping && e >= 0f) e %= a.length
         if (!animate && looping) e = 1f

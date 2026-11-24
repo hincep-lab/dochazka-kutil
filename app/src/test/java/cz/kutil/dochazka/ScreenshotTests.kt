@@ -245,8 +245,16 @@ class ScreenshotTests {
         val manualClock = androidx.compose.runtime.mutableFloatStateOf(0f)
         cz.kutil.dochazka.ui.WaterClockDebug.manual = manualClock
         cz.kutil.dochazka.ui.SoundTap.listener = { name -> println("SOUND_EVENT $frame $name") }
-        cz.kutil.dochazka.ui.PlumberDebug.log = { m -> if (frame % 48 == 0 || m.startsWith("act") || m.startsWith("director")) println("DBG $frame $m") }
-        val state = craftedState(open = true, pending = false, hoursAgo = 8.1)
+        // scénář videa: prasklá trubka, pak vana s kachničkou
+        cz.kutil.dochazka.ui.PlumberDebug.script = { t ->
+            when {
+                t in 2.5f..20f -> cz.kutil.dochazka.ui.Act.PIPE to (t - 2.5f)
+                t in 21f..40f -> cz.kutil.dochazka.ui.Act.TUB to (t - 21f)
+                else -> null
+            }
+        }
+        println("VIDEO_ACT PIPE 2.5")
+        println("VIDEO_ACT TUB 21.0")        val state = craftedState(open = true, pending = false, hoursAgo = 8.1)
         val vm = MainViewModel(ApplicationProvider.getApplicationContext())
         val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
         activity.setContent {
@@ -277,6 +285,7 @@ class ScreenshotTests {
         }
         cz.kutil.dochazka.ui.SoundTap.listener = null
         cz.kutil.dochazka.ui.PlumberDebug.forcedOrder = null
+        cz.kutil.dochazka.ui.PlumberDebug.script = null
         cz.kutil.dochazka.ui.WaterClockDebug.manual = null
     }
 
