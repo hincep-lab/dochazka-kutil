@@ -86,7 +86,7 @@ dependencies {
 // V záznamu sestavení je vidět každý test jménem a celkový součet.
 tasks.withType<Test>().configureEach {
     testLogging {
-        events("passed", "failed", "skipped")
+        events("passed", "failed", "skipped", "standard_out")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
     addTestListener(object : TestListener {
