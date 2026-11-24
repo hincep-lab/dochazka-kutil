@@ -490,7 +490,8 @@ fun QuickTile(text: String, @DrawableRes iconRes: Int, modifier: Modifier = Modi
     ) {
         Icon(painterResource(iconRes), null, tint = tint, modifier = Modifier.size(28.dp))
         Spacer(Modifier.height(3.dp))
-        Text(text, fontSize = shrink(13f), lineHeight = shrink(15f), fontWeight = FontWeight.Bold, color = Ind.text, textAlign = TextAlign.Center, maxLines = 2)
+        val narrow = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 390
+        Text(text, fontSize = if (narrow) shrink(11.5f) else shrink(13f), lineHeight = if (narrow) shrink(13.5f) else shrink(15f), softWrap = true, fontWeight = FontWeight.Bold, color = Ind.text, textAlign = TextAlign.Center, maxLines = 2)
     }
 }
 

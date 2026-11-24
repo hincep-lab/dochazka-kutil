@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -104,7 +105,8 @@ fun HomeScreen(
     val healthIn = remember(state.settings, state.zone, state.demo, perm, resumeTick, minute(now)) { readHealthInput(context, state, perm) }
     val gps = TrackingHealth.location(healthIn)
     val wifi = TrackingHealth.wifi(healthIn)
-    val big = LocalDensity.current.fontScale > 1.15f
+    // Velké systémové písmo nebo úzký displej: kompaktnější panel, aby se nic neořezávalo.
+    val big = LocalDensity.current.fontScale > 1.15f || LocalConfiguration.current.screenWidthDp < 390
     val limit = remember { AppPrefs.longShiftHours(context) }
     val minute = now / 60_000
 
@@ -379,7 +381,7 @@ private fun PanelHeadline(icon: Int, text: String, drop: Boolean, big: Boolean) 
         Icon(painterResource(icon), null, tint = Color.White, modifier = Modifier.size(if (big) 30.dp else 38.dp))
         Spacer(Modifier.size(10.dp))
         Text(
-            text, fontSize = if (big) 20.sp else 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, style = PanelText,
+            text, fontSize = if (big) shrink(21f) else 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, style = PanelText,
             modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         if (drop && !big) Icon(painterResource(R.drawable.ic_water_drop), null, tint = Color(0xFF8FD3FF), modifier = Modifier.size(30.dp))
@@ -390,7 +392,7 @@ private fun PanelHeadline(icon: Int, text: String, drop: Boolean, big: Boolean) 
 private fun PanelValue(label: String, value: String, modifier: Modifier, big: Boolean, note: String? = null) {
     Column(modifier) {
         Text(label, fontSize = 13.sp, color = Color.White.copy(alpha = 0.92f), style = PanelText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(value, fontSize = if (big) 23.sp else 29.sp, lineHeight = if (big) 28.sp else 33.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, style = PanelText, maxLines = 1)
+        Text(value, fontSize = if (big) shrink(24f) else 29.sp, lineHeight = if (big) shrink(29f) else 33.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, style = PanelText, maxLines = 1)
         if (note != null) Text(note, fontSize = 12.sp, color = Color.White.copy(alpha = 0.88f), style = PanelText, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

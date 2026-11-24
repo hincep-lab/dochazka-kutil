@@ -132,6 +132,7 @@ class ScreenshotTests {
         }
         val requested = mutableStateOf(tab)
         shoot(name) { AppRoot(vm, requested) }
+        println("SNIMEK $name: pozadavek=$tab zbyva=${requested.value} demo=${vm.state.value.demo} loaded=${vm.state.value.loaded}")
     }
 
     @Test
