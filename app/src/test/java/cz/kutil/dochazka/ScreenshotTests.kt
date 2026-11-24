@@ -267,23 +267,22 @@ class ScreenshotTests {
             ApplicationProvider.getApplicationContext<android.app.Application>().contentResolver,
             android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
         )
-        cz.kutil.dochazka.ui.PlumberDebug.forcedOrder = listOf(cz.kutil.dochazka.ui.Act.PIPE, cz.kutil.dochazka.ui.Act.TUB)
+        cz.kutil.dochazka.ui.PlumberDebug.forcedOrder = listOf(cz.kutil.dochazka.ui.Act.VALVE, cz.kutil.dochazka.ui.Act.BUCKET, cz.kutil.dochazka.ui.Act.COFFEE)
         val fps = 24
         var frame = 0
         val manualClock = androidx.compose.runtime.mutableFloatStateOf(0f)
         cz.kutil.dochazka.ui.WaterClockDebug.manual = manualClock
         cz.kutil.dochazka.ui.SoundTap.listener = { name -> println("SOUND_EVENT $frame $name") }
-        // scénář videa: prasklá trubka, pak vana s kachničkou
+        // scénář videa: utržený ventil, hasák a kbelík, přestávka na kávu
         cz.kutil.dochazka.ui.PlumberDebug.script = { t ->
             when {
-                t in 2.5f..20f -> cz.kutil.dochazka.ui.Act.PIPE to (t - 2.5f)
-                t in 21f..40f -> cz.kutil.dochazka.ui.Act.TUB to (t - 21f)
+                t in 1f..18f -> cz.kutil.dochazka.ui.Act.VALVE to (t - 1f)
+                t in 18.5f..35f -> cz.kutil.dochazka.ui.Act.BUCKET to (t - 18.5f)
+                t in 35.5f..54f -> cz.kutil.dochazka.ui.Act.COFFEE to (t - 35.5f)
                 else -> null
             }
         }
-        println("VIDEO_ACT PIPE 2.5")
-        println("VIDEO_ACT TUB 21.0")
-        val state = craftedState(open = true, pending = false, hoursAgo = 8.6)
+        val state = craftedState(open = true, pending = false, hoursAgo = 5.5)
         val vm = MainViewModel(ApplicationProvider.getApplicationContext())
         val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
         activity.setContent {
@@ -297,7 +296,7 @@ class ScreenshotTests {
             }
         }
         val dir = File("build/video").apply { mkdirs() }
-        val total = (42.5 * fps).toInt()
+        val total = (54.5 * fps).toInt()
         val view = activity.window.decorView
         val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)

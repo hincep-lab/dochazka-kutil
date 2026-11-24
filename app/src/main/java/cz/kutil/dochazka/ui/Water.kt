@@ -356,8 +356,8 @@ private fun DrawScope.drawWater(
 private fun DrawScope.drawPourStream(nx: Float, hit: Float, flow: Float, t: Float, h: Float) {
     val d = density
     val k = ((flow - 0.12f) / 0.88f).coerceIn(0f, 1f)
-    val wTop = (3.2f + 3.4f * k) * d
-    val wBot = (2.4f + 2.6f * k) * d
+    val wTop = (4.5f + 4f * k) * d
+    val wBot = (3.4f + 3f * k) * d
     val wob = 0.6f * d * sin(t * 17f)
     val body = Path().apply {
         moveTo(nx - wTop / 2, 0f)
@@ -367,7 +367,7 @@ private fun DrawScope.drawPourStream(nx: Float, hit: Float, flow: Float, t: Floa
         cubicTo(nx - wBot / 2 + wob, hit * 0.7f, nx - wTop / 2, hit * 0.4f, nx - wTop / 2, 0f)
         close()
     }
-    drawPath(body, Brush.horizontalGradient(listOf(Color(0x8854B6FF), Color(0xDDE6F6FF), Color(0x8854B6FF)), startX = nx - wTop / 2, endX = nx + wTop / 2), alpha = 0.35f + 0.6f * k)
+    drawPath(body, Brush.horizontalGradient(listOf(Color(0xAA54B6FF), Color(0xEEEFF8FF), Color(0xAA3E9BEA)), startX = nx - wTop / 2, endX = nx + wTop / 2), alpha = 0.45f + 0.55f * k)
     // tenký lesk uprostřed a putující odlesky dolů
     drawLine(Color.White.copy(alpha = 0.55f * k), Offset(nx - 0.6f * d, 0f), Offset(nx - 0.6f * d + wob, hit), strokeWidth = 0.9f * d)
     for (i in 0 until 6) {

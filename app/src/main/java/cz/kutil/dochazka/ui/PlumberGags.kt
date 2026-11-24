@@ -453,7 +453,7 @@ private fun poseCoffee(e: Float, t: Float, sx: Float, boxH: Float, w: Float, u: 
         e < 9.4f -> P(sx - 4 * u, t, sit = 1f, lift = seat, armR = 60f, carry = 4, grin = -0.6f, wet = true, lean = -0.3f) // kapka na hlavu: kouká nahoru
         e < 11.4f -> { // vystřelí ho to – letí s přemety doprava pryč
             val q = sg(e, 9.5f, 11.2f)
-            P(lp(sx - 4 * u, w + 90 * u, q), t, sit = 1f - q, lift = seat + 150 * u * sin(q * PIf * 0.8f), tilt = -540f * q, armR = 170f, armL = -170f, wet = true, closed = true, capLift = 30 * u * q, capSpin = q * 400f, wrench = false)
+            P(lp(sx - 4 * u, w + 90 * u, q), t, sit = 1f - q, lift = seat + 95 * u * sin(q * PIf * 0.8f), tilt = -540f * q, armR = 170f, armL = -170f, wet = true, closed = true, capLift = 30 * u * q, capSpin = q * 400f, wrench = false)
         }
         e < 12.8f -> P(w + 90 * u, t, wrench = false) // mimo jeviště
         e < 14.4f -> { val (r, l) = walkArms(t); P(lp(w + 70 * u, sx + 28 * u, ez(sg(e, 12.8f, 14.4f))), t, facing = -1f, run = 0.55f, armR = r, armL = l, wet = true, dazed = 0.6f * (1f - sg(e, 12.8f, 14.4f)), wrench = false) }
