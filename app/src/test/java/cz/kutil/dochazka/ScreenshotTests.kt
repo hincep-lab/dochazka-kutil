@@ -142,7 +142,27 @@ class ScreenshotTests {
                     for (e in times) {
                         cz.kutil.dochazka.ui.PlumberWorkshop(
                             clock, cz.kutil.dochazka.ui.WaterState(1f, 0f), animate = true, working = false,
-                            onSound = {}, fixedElapsed = e,
+                            onSound = {}, fixedElapsed = e, fixedScene = cz.kutil.dochazka.ui.GagScene.PIPE,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1600dp-xxhdpi")
+    fun toiletGag() {
+        val times = listOf(2.0f, 3.8f, 5.2f, 7.4f, 8.8f, 10.6f, 11.6f, 12.8f, 14.5f)
+        shoot("14_instalater_zachod") {
+            Box(Modifier.fillMaxSize()) {
+                WetBackground()
+                androidx.compose.foundation.layout.Column {
+                    val clock = androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(37.3f) }
+                    for (e in times) {
+                        cz.kutil.dochazka.ui.PlumberWorkshop(
+                            clock, cz.kutil.dochazka.ui.WaterState(1f, 0f), animate = true, working = false,
+                            onSound = {}, fixedElapsed = e, fixedScene = cz.kutil.dochazka.ui.GagScene.TOILET,
                         )
                     }
                 }

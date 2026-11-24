@@ -42,6 +42,10 @@ class WaterSounds(ctx: Context) {
     private val boing = pool.load(ctx, R.raw.gag_boing, 1)
     private val thud = pool.load(ctx, R.raw.gag_thud, 1)
     private val spray = pool.load(ctx, R.raw.gag_spray, 1)
+    private val plop = pool.load(ctx, R.raw.gag_plop, 1)
+    private val gurgle = pool.load(ctx, R.raw.gag_gurgle, 1)
+    private val popS = pool.load(ctx, R.raw.gag_pop, 1)
+    private val flush = pool.load(ctx, R.raw.gag_flush, 1)
     private var overflowStream = 0
     private var sprayStream = 0
 
@@ -57,6 +61,10 @@ class WaterSounds(ctx: Context) {
             GagSound.CLANK -> pool.play(clank, 0.45f, 0.45f, 1, 0, 0.95f + Math.random().toFloat() * 0.1f)
             GagSound.BOING -> pool.play(boing, 0.45f, 0.45f, 1, 0, 1f)
             GagSound.THUD -> pool.play(thud, 0.5f, 0.5f, 1, 0, 1f)
+            GagSound.PLOP -> pool.play(plop, 0.5f, 0.5f, 1, 0, 0.9f + Math.random().toFloat() * 0.2f)
+            GagSound.GURGLE -> pool.play(gurgle, 0.45f, 0.45f, 1, 0, 1f)
+            GagSound.POP -> pool.play(popS, 0.55f, 0.55f, 1, 0, 1f)
+            GagSound.FLUSH -> pool.play(flush, 0.45f, 0.45f, 1, 0, 1f)
         }
     }
 

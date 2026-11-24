@@ -131,8 +131,51 @@ def hiss():
     save('gag_spray', x[:-fade], -16)
 
 
+def plop():
+    total = 0.35
+    n = int(total * SR); t = np.arange(n) / SR
+    x = chirp(0.18, 420, 110, 0.07, 0.0, total) + rng.normal(0, 1, n) * np.exp(-t / 0.03) * 0.25
+    x += chirp(0.05, 900, 300, 0.02, 0.12, total) * 0.4
+    save('gag_plop', x, -9)
+
+
+def gurgle():
+    total = 1.2
+    x = np.zeros(int(total * SR))
+    for _ in range(26):
+        t0 = rng.uniform(0, total - 0.1); f0 = rng.uniform(140, 380)
+        x += chirp(0.07, f0, f0 * rng.uniform(1.4, 2.2), rng.uniform(0.02, 0.05), t0, total) * rng.uniform(0.4, 1.0)
+    save('gag_gurgle', x, -9)
+
+
+def pop():
+    total = 0.3
+    n = int(total * SR); t = np.arange(n) / SR
+    x = rng.normal(0, 1, n) * np.exp(-t / 0.006) + chirp(0.12, 700, 1400, 0.03, 0.0, total) * 0.8
+    save('gag_pop', x, -8)
+
+
+def flush():
+    total = 2.2
+    n = int(total * SR); t = np.arange(n) / SR
+    noise = rng.normal(0, 1, n)
+    spec = np.fft.rfft(noise); f = np.fft.rfftfreq(n, 1 / SR)
+    band = np.exp(-((np.log(f + 1) - np.log(900)) ** 2) / (2 * 0.8 ** 2))
+    x = np.fft.irfft(spec * band, n)
+    x = x / np.max(np.abs(x)) * np.minimum(1, t / 0.1) * np.exp(-np.maximum(0, t - 1.2) / 0.35)
+    x *= 0.75 + 0.25 * np.sin(2 * np.pi * (3 + 4 * t) * t)  # vír
+    for _ in range(20):
+        t0 = rng.uniform(0.9, 1.9); f0 = rng.uniform(250, 600)
+        x += chirp(0.06, f0, f0 * 1.8, 0.03, t0, total) * 0.3
+    save('gag_flush', x, -10)
+
+
 drip()
 overflow()
+plop()
+gurgle()
+pop()
+flush()
 clank()
 splash()
 boing()
