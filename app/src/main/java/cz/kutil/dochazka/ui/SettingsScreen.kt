@@ -143,14 +143,14 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
             )
             var gag by remember { mutableStateOf(AppPrefs.plumberGag(context)) }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Instalatér Kutil (3D gagy)", Modifier.weight(1f))
+                Text("Instalatér Kutil (vtipná scénka)", Modifier.weight(1f))
                 Switch(checked = gag, onCheckedChange = {
                     gag = it
                     AppPrefs.setPlumberGag(context, it)
                 })
             }
             Text(
-                "Během směny Kutil dole na přehledu sám předvádí deset loutkových gagů, mimo směnu občas mávne a od 20:00 spí. Ovládání pod ním funguje normálně.",
+                "Dole na přehledu občas praskne trubka a Kutil ji „opraví“. Spustí se po začátku práce, pak jednou za pár minut a kdykoli po klepnutí.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }

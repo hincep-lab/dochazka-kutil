@@ -131,6 +131,165 @@ class ScreenshotTests {
     @Config(qualifiers = "w412dp-h1500dp-xxhdpi")
     fun homePending() = home("03_prehled_dotaz", craftedState(open = false, pending = true))
 
+    /** Scénka s instalatérem v několika okamžicích pod sebou. */
+    @Test
+    @Config(qualifiers = "w412dp-h1600dp-xxhdpi")
+    fun plumberGag() {
+        val times = listOf(2.0f, 3.9f, 5.25f, 6.3f, 7.6f, 10.4f, 12.0f, 14.2f, 15.3f)
+        shoot("13_instalater_scenka") {
+            Box(Modifier.fillMaxSize()) {
+                WetBackground()
+                androidx.compose.foundation.layout.Column {
+                    val clock = androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(37.3f) }
+                    for (e in times) {
+                        cz.kutil.dochazka.ui.PlumberWorkshop(
+                            clock, cz.kutil.dochazka.ui.WaterState(1f, 0f), animate = true, working = false,
+                            onSound = {}, fixedElapsed = e, fixedScene = cz.kutil.dochazka.ui.GagScene.PIPE,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1600dp-xxhdpi")
+    fun toiletGag() {
+        val times = listOf(2.0f, 3.8f, 5.2f, 7.4f, 8.8f, 10.6f, 11.6f, 12.8f, 14.5f)
+        shoot("14_instalater_zachod") {
+            Box(Modifier.fillMaxSize()) {
+                WetBackground()
+                androidx.compose.foundation.layout.Column {
+                    val clock = androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(37.3f) }
+                    for (e in times) {
+                        cz.kutil.dochazka.ui.PlumberWorkshop(
+                            clock, cz.kutil.dochazka.ui.WaterState(1f, 0f), animate = true, working = false,
+                            onSound = {}, fixedElapsed = e, fixedScene = cz.kutil.dochazka.ui.GagScene.TOILET,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun stage(name: String, act: cz.kutil.dochazka.ui.Act, times: List<Float>) {
+        shoot(name) {
+            Box(Modifier.fillMaxSize()) {
+                WetBackground()
+                androidx.compose.foundation.layout.Column {
+                    val clock = androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(37.3f) }
+                    for (e in times) {
+                        cz.kutil.dochazka.ui.PlumberStage(
+                            clock, cz.kutil.dochazka.ui.WaterState(1f, 0f), animate = true, onSound = {},
+                            modifier = Modifier.fillMaxWidth().height(cz.kutil.dochazka.ui.StageHeight),
+                            fixedAct = act, fixedElapsed = e,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageLadder() = stage("15_stafle", cz.kutil.dochazka.ui.Act.LADDER, listOf(2f, 5.5f, 8f, 10.2f, 11.8f, 13.4f, 15f, 16.5f, 17f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageSink() = stage("16_drez", cz.kutil.dochazka.ui.Act.SINK, listOf(2f, 4.6f, 7f, 10.3f, 11.2f, 12.5f, 13.6f, 15f, 16f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageTub() = stage("17_vana", cz.kutil.dochazka.ui.Act.TUB, listOf(2f, 3.8f, 6f, 10f, 12.15f, 12.6f, 13.6f, 14.8f, 16.5f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageLounge() {
+        shoot("19_televize_a_spanek") {
+            Box(Modifier.fillMaxSize()) {
+                WetBackground()
+                androidx.compose.foundation.layout.Column {
+                    val clock = androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(37.3f) }
+                    for ((act, e) in listOf(cz.kutil.dochazka.ui.Act.TV to 2f, cz.kutil.dochazka.ui.Act.TV to 4.2f, cz.kutil.dochazka.ui.Act.TV to 9.5f,
+                        cz.kutil.dochazka.ui.Act.TV to 18.5f, cz.kutil.dochazka.ui.Act.SLEEP to 3f, cz.kutil.dochazka.ui.Act.SLEEP to 10f)) {
+                        cz.kutil.dochazka.ui.PlumberStage(
+                            clock, cz.kutil.dochazka.ui.WaterState(0f, 0f), animate = true, onSound = {},
+                            modifier = Modifier.fillMaxWidth().height(cz.kutil.dochazka.ui.StageHeight),
+                            fixedAct = act, fixedElapsed = e,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageWander() = stage("18_prochazka", cz.kutil.dochazka.ui.Act.WANDER, listOf(2f, 5f, 8f))
+
+    /**
+     * Ukázkové video (snímky 24/s) – běží jen když je nastavené MAKE_VIDEO=1.
+     * Přehled v přesčasu: přetéká nádoba, kape kohoutek a Kutil hraje dvě scénky.
+     */
+    @Test
+    @Config(qualifiers = "w412dp-h915dp-xxhdpi")
+    fun demoVideo() {
+        org.junit.Assume.assumeTrue(System.getenv("MAKE_VIDEO") == "1")
+        android.provider.Settings.Global.putFloat(
+            ApplicationProvider.getApplicationContext<android.app.Application>().contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
+        )
+        cz.kutil.dochazka.ui.PlumberDebug.forcedOrder = listOf(cz.kutil.dochazka.ui.Act.PIPE, cz.kutil.dochazka.ui.Act.TUB)
+        val fps = 24
+        var frame = 0
+        val manualClock = androidx.compose.runtime.mutableFloatStateOf(0f)
+        cz.kutil.dochazka.ui.WaterClockDebug.manual = manualClock
+        cz.kutil.dochazka.ui.SoundTap.listener = { name -> println("SOUND_EVENT $frame $name") }
+        // scénář videa: prasklá trubka, pak vana s kachničkou
+        cz.kutil.dochazka.ui.PlumberDebug.script = { t ->
+            when {
+                t in 2.5f..20f -> cz.kutil.dochazka.ui.Act.PIPE to (t - 2.5f)
+                t in 21f..40f -> cz.kutil.dochazka.ui.Act.TUB to (t - 21f)
+                else -> null
+            }
+        }
+        println("VIDEO_ACT PIPE 2.5")
+        println("VIDEO_ACT TUB 21.0")
+        val state = craftedState(open = true, pending = false, hoursAgo = 8.6)
+        val vm = MainViewModel(ApplicationProvider.getApplicationContext())
+        val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+        activity.setContent {
+            DochazkaTheme {
+                Box(Modifier.fillMaxSize()) {
+                    WetBackground()
+                    Box(Modifier.statusBarsPadding()) {
+                        HomeScreen(vm, state, onOpenDay = {}, onOpenTab = {}, onEndWork = {}, onOpenDiag = {})
+                    }
+                }
+            }
+        }
+        val dir = File("build/video").apply { mkdirs() }
+        val total = (42.5 * fps).toInt()
+        val view = activity.window.decorView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        while (frame < total) {
+            manualClock.floatValue = frame / fps.toFloat()
+            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1000L / fps))
+            bmp.eraseColor(android.graphics.Color.BLACK)
+            view.draw(canvas)
+            val small = Bitmap.createScaledBitmap(bmp, 720, bmp.height * 720 / bmp.width / 2 * 2, true)
+            File(dir, "f%05d.jpg".format(frame)).outputStream().use { small.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+            small.recycle()
+            frame++
+        }
+        cz.kutil.dochazka.ui.SoundTap.listener = null
+        cz.kutil.dochazka.ui.PlumberDebug.forcedOrder = null
+        cz.kutil.dochazka.ui.PlumberDebug.script = null
+        cz.kutil.dochazka.ui.WaterClockDebug.manual = null
+    }
+
     /** Celá aplikace s lištami nad ukázkovými daty (demo režim). */
     private fun app(name: String, tab: String?) {
         val vm = MainViewModel(ApplicationProvider.getApplicationContext())

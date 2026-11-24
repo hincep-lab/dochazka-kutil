@@ -15,7 +15,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cz.kutil.dochazka.core.Interval
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.res.painterResource
 import cz.kutil.dochazka.R
 import cz.kutil.dochazka.data.AutoBackup
@@ -133,8 +132,7 @@ fun HomeScreen(
     val panelBounds = remember { PanelBounds() }
     val soundsOn = animate && remember(resumeTick) { soundsEnabled(context) }
     val sounds = rememberWaterSounds(soundsOn)
-    // při omezeném pohybu se místo gagů ukáže statický obrázek Kutila
-    val gagOn = remember(resumeTick) { AppPrefs.plumberGag(context) }
+    val gagOn = animate && remember(resumeTick) { AppPrefs.plumberGag(context) }
     val reportStart = open?.let { it.editedStart ?: Rounding.roundToHalfHour(Instant.ofEpochMilli(it.rawStart)).toEpochMilli() }
     val worked = reportStart?.let { now - it } ?: 0L
     val runStart = reportStart
@@ -376,19 +374,18 @@ fun HomeScreen(
             }
         }
         // místo dole, aby šel obsah odrolovat nad vpusť a Kutilovo jeviště
-        Spacer(Modifier.height(if (gagOn) 190.dp else 70.dp))
+        Spacer(Modifier.height(if (gagOn) StageHeight - 40.dp else 70.dp))
     }
     // v přesčasu stéká voda z nádoby přes celou obrazovku do vpusti
     OverflowOverlay(clock, overflowing = open != null && worked > 8 * 3_600_000L, animate = animate, panel = panelBounds, modifier = Modifier.fillMaxSize())
     // Kutil sám chodí po spodní části přehledu a střídá scénky (doteky propouští k tlačítkům)
     if (gagOn) {
-        KutilStage(
-            // pracuje jen během směny; mimo ni občas mávne, od 20:00 do 6:00 spí na trubce
+        PlumberStage(
+            clock, water, animate, onSound = { sounds?.gag(it) },
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(StageHeight),
+            // pracuje jen během směny; po práci televize a pivo, od 20:00 do 6:00 spí
             working = open != null,
             night = Fmt.zoned(now).hour.let { it >= 20 || it < 6 },
-            animate = animate,
-            onSound = { sounds?.gag(it) },
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().aspectRatio(8f / 5f),
         )
     }
     }

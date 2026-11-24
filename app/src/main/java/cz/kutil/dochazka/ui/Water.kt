@@ -153,7 +153,7 @@ enum class GlassTone { WORKING, PENDING, IDLE }
 val WaterZone: Dp = 46.dp
 
 /** Kde je ústí kohoutku vůči pravému okraji panelu. */
-val FaucetNozzleFromEnd: Dp = 114.dp
+val FaucetNozzleFromEnd: Dp = 103.dp
 
 // Kohoutek z balíku grafiky (graphics/valves/vodovodni-kohoutek.png, 740×430), zrcadlově:
 // přívod vpravo u okraje obrazovky, ústí podle PRIPOJOVACI_BODY.json v (1 − 0,852; 0,8323).
@@ -211,7 +211,8 @@ fun WaterPanel(
             }
         }
         // ústí kohoutku sedí 4 dp pod horní hranou panelu
-        Faucet(water, Modifier.align(Alignment.TopEnd).offset(x = 14.dp, y = -(FaucetH * NOZZLE_FY) + 4.dp))
+        // přívod kohoutku (8,75 % šířky obrázku) přesně na pravém okraji obrazovky – kohoutek „vychází ze zdi“
+        Faucet(water, Modifier.align(Alignment.TopEnd).offset(x = 12.dp + FaucetW * 0.0875f, y = -(FaucetH * NOZZLE_FY) + 4.dp))
     }
 }
 

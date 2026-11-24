@@ -24,9 +24,6 @@ import cz.kutil.dochazka.data.AppPrefs
  *  - telefon není v tichém režimu ani na vibracích,
  *  - aplikace je na obrazovce (při odchodu z aplikace se vše zastaví).
  */
-/** Zvukové efekty gagů (syntetizované, tiché). */
-enum class GagSound { BURST_START, BURST_STOP, SPLASH, CLANK, BOING, THUD, PLOP, GURGLE, POP, FLUSH, SNORE, SQUEAK, BURP, CHEER }
-
 /** Jen pro testy: záznam, kdy aplikace přehrála jaký zvuk (pro ozvučení ukázkového videa). */
 object SoundTap {
     @Volatile var listener: ((String) -> Unit)? = null
