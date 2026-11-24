@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector android:width="64dp" android:height="16dp" android:viewportWidth="64" android:viewportHeight="16">
+            <path android:fillColor="#88FFFFFF" android:pathData="M20,8 A12,3.5 0 1 0 44,8 A12,3.5 0 1 0 20,8 Z" />
+            <group android:name="r0" android:pivotX="32" android:pivotY="8"><path android:name="p0" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.2" android:strokeAlpha="0" android:pathData="M2,8 A30,6 0 1 0 62,8 A30,6 0 1 0 2,8 Z" /></group><group android:name="r1" android:pivotX="32" android:pivotY="8"><path android:name="p1" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.2" android:strokeAlpha="0" android:pathData="M2,8 A30,6 0 1 0 62,8 A30,6 0 1 0 2,8 Z" /></group><group android:name="r2" android:pivotX="32" android:pivotY="8"><path android:name="p2" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.2" android:strokeAlpha="0" android:pathData="M2,8 A30,6 0 1 0 62,8 A30,6 0 1 0 2,8 Z" /></group>
+        </vector>
+    </aapt:attr>
+    <target android:name="r0">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator android:propertyName="scaleX" android:valueFrom="0.2" android:valueTo="1" android:duration="1200" android:startOffset="0" android:repeatCount="infinite" android:interpolator="@android:anim/decelerate_interpolator" />
+                <objectAnimator android:propertyName="scaleY" android:valueFrom="0.2" android:valueTo="1" android:duration="1200" android:startOffset="0" android:repeatCount="infinite" android:interpolator="@android:anim/decelerate_interpolator" />
+            </set>
+        </aapt:attr>
+    </target>
+    <target android:name="p0">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="strokeAlpha" android:valueFrom="0.9" android:valueTo="0" android:duration="1200" android:startOffset="0" android:repeatCount="infinite" />
+        </aapt:attr>
+    </target>
+    <target android:name="r1">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator android:propertyName="scaleX" android:valueFrom="0.2" android:valueTo="1" android:duration="1200" android:startOffset="400" android:repeatCount="infinite" android:interpolator="@android:anim/decelerate_interpolator" />
+                <objectAnimator android:propertyName="scaleY" android:valueFrom="0.2" android:valueTo="1" android:duration="1200" android:startOffset="400" android:repeatCount="infinite" android:interpolator="@android:anim/decelerate_interpolator" />
+            </set>
+        </aapt:attr>
+    </target>
+    <target android:name="p1">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="strokeAlpha" android:valueFrom="0.9" android:valueTo="0" android:duration="1200" android:startOffset="400" android:repeatCount="infinite" />
+        </aapt:attr>
+    </target>
+    <target android:name="r2">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator android:propertyName="scaleX" android:valueFrom="0.2" android:valueTo="1" android:duration="1200" android:startOffset="800" android:repeatCount="infinite" android:interpolator="@android:anim/decelerate_interpolator" />
+                <objectAnimator android:propertyName="scaleY" android:valueFrom="0.2" android:valueTo="1" android:duration="1200" android:startOffset="800" android:repeatCount="infinite" android:interpolator="@android:anim/decelerate_interpolator" />
+            </set>
+        </aapt:attr>
+    </target>
+    <target android:name="p2">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="strokeAlpha" android:valueFrom="0.9" android:valueTo="0" android:duration="1200" android:startOffset="800" android:repeatCount="infinite" />
+        </aapt:attr>
+    </target>
+</animated-vector>

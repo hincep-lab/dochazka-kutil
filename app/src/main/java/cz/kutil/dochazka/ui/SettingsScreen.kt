@@ -1,6 +1,7 @@
 package cz.kutil.dochazka.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import kotlinx.coroutines.launch
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -116,16 +117,18 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
 
         SectionCard("Vzhled") {
             var decor by remember { mutableStateOf(AppPrefs.decorAnimations(context)) }
+            val widgetScope = androidx.compose.runtime.rememberCoroutineScope()
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Dekorativní animace vody", Modifier.weight(1f))
                 Switch(checked = decor, onCheckedChange = {
                     decor = it
                     AppPrefs.setDecorAnimations(context, it)
+                    widgetScope.launch { runCatching { cz.kutil.dochazka.widget.DochazkaWidget.updateAll(context) } }
                 })
             }
             Text(
                 "Kapající kohoutek, nádoba plnící se k 8 hodinám, proudění v potrubí a vír u vpusti. Běží jen když je aplikace na obrazovce, " +
-                    "nejvýš 30 snímků za sekundu. Při vypnutí (nebo když má telefon zapnuté „Odebrat animace“) zůstane klidný statický vzhled. " +
+                    "plynule s obnovovací frekvencí displeje (60 i více snímků za sekundu). Totéž ve widgetu na ploše (bez zvuku). Při vypnutí (nebo když má telefon zapnuté „Odebrat animace“) zůstane klidný statický vzhled. " +
                     "Na docházku nemají animace žádný vliv.",
                 style = MaterialTheme.typography.bodySmall,
             )

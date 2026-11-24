@@ -1,66 +1,211 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Widget s živou vodou: animace běží v launcheru (animované vektory v ProgressBarech),
+     aplikace kvůli nim nemusí běžet; bez zvuku. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:padding="10dp">
 
-    <LinearLayout
-        android:id="@+id/w_status_bar"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@drawable/widget_status_idle"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="8dp">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:minHeight="76dp">
 
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+        <!-- skleněná nádoba -->
+        <FrameLayout
+            android:id="@+id/w_vessel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="26dp"
+            android:background="@drawable/widget_glass"
+            android:clipToOutline="true">
 
-            <TextView
-                android:id="@+id/w_status"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:maxLines="1"
-                android:text="DOMA"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:textStyle="bold" />
+            <!-- kapka / proud z kohoutku (padá až k hladině, pod vodou je schovaná) -->
+            <ProgressBar
+                android:id="@+id/w_drip"
+                android:layout_width="24dp"
+                android:layout_height="match_parent"
+                android:indeterminate="true"
+                android:indeterminateOnly="false"
+                android:indeterminateDrawable="@drawable/widget_drip"
+                android:indeterminateTint="#FFFFFFFF"
+                android:indeterminateTintMode="multiply"
+                android:minWidth="1dp" android:maxWidth="2000dp"
+                android:minHeight="1dp" android:maxHeight="2000dp"
+                android:layout_gravity="end" android:layout_marginEnd="43dp" />
+            <ProgressBar
+                android:id="@+id/w_stream"
+                android:layout_width="12dp"
+                android:layout_height="match_parent"
+                android:indeterminate="true"
+                android:indeterminateOnly="false"
+                android:indeterminateDrawable="@drawable/widget_stream"
+                android:indeterminateTint="#FFFFFFFF"
+                android:indeterminateTintMode="multiply"
+                android:minWidth="1dp" android:maxWidth="2000dp"
+                android:minHeight="1dp" android:maxHeight="2000dp"
+                android:layout_gravity="end" android:layout_marginEnd="49dp" android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/w_start"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:maxLines="1"
-                android:textColor="#E6F0FF"
-                android:textSize="12sp" />
-        </LinearLayout>
+            <!-- voda: výška podle odpracované doby (weightSum se mění z widgetu) -->
+            <LinearLayout
+                android:id="@+id/w_level"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="bottom"
+                android:orientation="vertical"
+                android:weightSum="10">
 
-        <Chronometer
-            android:id="@+id/w_timer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:minHeight="14dp">
 
-        <TextView
-            android:id="@+id/w_today"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
-            android:textSize="24sp"
-            android:textStyle="bold" />
-    </LinearLayout>
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_marginTop="9dp"
+                        android:background="@drawable/widget_water_body" />
+
+                    <ProgressBar
+                android:id="@+id/w_wave"
+                android:layout_width="match_parent"
+                android:layout_height="14dp"
+                android:indeterminate="true"
+                android:indeterminateOnly="false"
+                android:indeterminateDrawable="@drawable/widget_wave"
+                android:indeterminateTint="#FFFFFFFF"
+                android:indeterminateTintMode="multiply"
+                android:minWidth="1dp" android:maxWidth="2000dp"
+                android:minHeight="1dp" android:maxHeight="2000dp"
+                 />
+                    <ImageView
+                        android:id="@+id/w_wave_static"
+                        android:layout_width="match_parent"
+                        android:layout_height="14dp"
+                        android:scaleType="fitXY"
+                        android:src="@drawable/widget_wave"
+                        android:visibility="gone" />
+                    <ProgressBar
+                android:id="@+id/w_ripple"
+                android:layout_width="64dp"
+                android:layout_height="16dp"
+                android:indeterminate="true"
+                android:indeterminateOnly="false"
+                android:indeterminateDrawable="@drawable/widget_ripple"
+                android:indeterminateTint="#FFFFFFFF"
+                android:indeterminateTintMode="multiply"
+                android:minWidth="1dp" android:maxWidth="2000dp"
+                android:minHeight="1dp" android:maxHeight="2000dp"
+                android:layout_gravity="end" android:layout_marginEnd="23dp" android:layout_marginTop="2dp" />
+                    <ProgressBar
+                android:id="@+id/w_foam"
+                android:layout_width="64dp"
+                android:layout_height="16dp"
+                android:indeterminate="true"
+                android:indeterminateOnly="false"
+                android:indeterminateDrawable="@drawable/widget_foam"
+                android:indeterminateTint="#FFFFFFFF"
+                android:indeterminateTintMode="multiply"
+                android:minWidth="1dp" android:maxWidth="2000dp"
+                android:minHeight="1dp" android:maxHeight="2000dp"
+                android:layout_gravity="end" android:layout_marginEnd="23dp" android:layout_marginTop="2dp" android:visibility="gone" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/w_over"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:indeterminate="true"
+                android:indeterminateOnly="false"
+                android:indeterminateDrawable="@drawable/widget_overflow"
+                android:indeterminateTint="#FFFFFFFF"
+                android:indeterminateTintMode="multiply"
+                android:minWidth="1dp" android:maxWidth="2000dp"
+                android:minHeight="1dp" android:maxHeight="2000dp"
+                android:visibility="gone" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="22dp"
+                android:background="@drawable/widget_glass_shine" />
+
+            <!-- texty nad vodou -->
+            <LinearLayout
+                android:id="@+id/w_status_bar"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/w_status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:maxLines="1"
+                        android:shadowColor="#CC000000"
+                        android:shadowRadius="4"
+                        android:text="DOMA"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/w_start"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:maxLines="1"
+                        android:shadowColor="#CC000000"
+                        android:shadowRadius="4"
+                        android:textColor="#E6F0FF"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <Chronometer
+                    android:id="@+id/w_timer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:shadowColor="#CC000000"
+                    android:shadowRadius="4"
+                    android:textColor="#8CF27A"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/w_today"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:shadowColor="#CC000000"
+                    android:shadowRadius="4"
+                    android:textColor="#FFFFFF"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- kohoutek vychází z pravého okraje nádoby -->
+        <ImageView
+            android:layout_width="64dp"
+            android:layout_height="37dp"
+            android:layout_gravity="top|end"
+            android:scaleType="fitXY"
+            android:scaleX="-1"
+            android:src="@drawable/g_kohoutek" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/w_pending"
@@ -76,7 +221,7 @@
     <TextView
         android:id="@+id/w_button"
         android:layout_width="match_parent"
-        android:layout_height="46dp"
+        android:layout_height="44dp"
         android:layout_marginTop="8dp"
         android:background="@drawable/widget_button_go"
         android:gravity="center"

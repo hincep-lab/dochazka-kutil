@@ -58,8 +58,16 @@ class DochazkaWidget : AppWidgetProvider() {
             val ids = manager.getAppWidgetIds(ComponentName(app, DochazkaWidget::class.java))
             if (ids.isEmpty()) return
             val s = QuickActions.status(app)
+            val views = build(app, s)
+            manager.updateAppWidget(ids, views)
+            scheduleLevelRefresh(app, s.working)
+        }
+
+        /** Sestaví vzhled widgetu (oddělené kvůli testu vzhledu). */
+        fun build(app: Context, s: QuickStatus, nowMs: Long = System.currentTimeMillis()): RemoteViews {
             val views = RemoteViews(app.packageName, R.layout.widget_dochazka)
             val start = s.startMs
+            applyWater(app, views, s, nowMs)
             if (s.working && start != null) {
                 views.setTextViewText(R.id.w_status, "PRÁVĚ PRACUJEŠ")
                 views.setInt(R.id.w_status_bar, "setBackgroundResource", R.drawable.widget_status_working)
@@ -100,7 +108,58 @@ class DochazkaWidget : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.w_button, toggle)
             views.setOnClickPendingIntent(R.id.w_root, open)
-            manager.updateAppWidget(ids, views)
+            return views
         }
+
+        /**
+         * Voda v nádobě jako v aplikaci: v práci z kohoutku teče proud a nádoba se plní k 8 hodinám,
+         * po nich přetéká; doma jen kape. Animace (60+ snímků/s) počítá launcher sám, bez zvuku.
+         */
+        private fun applyWater(app: Context, views: RemoteViews, s: QuickStatus, nowMs: Long) {
+            val start = s.startMs
+            val working = s.working && start != null
+            val level = if (working) (nowMs - start!!) / (8f * 3_600_000f) else 0f
+            val over = level > 1f
+            val fill = level.coerceIn(0.12f, 1f)
+            views.setFloat(R.id.w_level, "setWeightSum", 1f / fill)
+            views.setInt(R.id.w_vessel, "setBackgroundResource", if (!working && s.pending > 0) R.drawable.widget_glass_pending else R.drawable.widget_glass)
+            val animate = animationsAllowed(app)
+            fun show(id: Int, on: Boolean) = views.setViewVisibility(id, if (on) View.VISIBLE else View.GONE)
+            show(R.id.w_wave, animate)
+            show(R.id.w_wave_static, !animate)
+            show(R.id.w_stream, animate && working && !over)
+            show(R.id.w_foam, animate && working && !over)
+            show(R.id.w_drip, animate && !working)
+            show(R.id.w_ripple, animate && !working)
+            show(R.id.w_over, animate && over)
+        }
+
+        private fun animationsAllowed(ctx: Context): Boolean {
+            val system = runCatching {
+                android.provider.Settings.Global.getFloat(ctx.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+            }.getOrDefault(1f)
+            return cz.kutil.dochazka.data.AppPrefs.decorAnimations(ctx) && system > 0f
+        }
+
+        /** Během směny widget každých 10 minut přepočítá výšku hladiny (jinak se nic neděje). */
+        private fun scheduleLevelRefresh(ctx: Context, working: Boolean) {
+            val wm = androidx.work.WorkManager.getInstance(ctx)
+            if (working) {
+                wm.enqueueUniqueWork(
+                    "widget_level", androidx.work.ExistingWorkPolicy.REPLACE,
+                    androidx.work.OneTimeWorkRequestBuilder<WidgetLevelWorker>().setInitialDelay(10, java.util.concurrent.TimeUnit.MINUTES).build(),
+                )
+            } else {
+                wm.cancelUniqueWork("widget_level")
+            }
+        }
+    }
+}
+
+/** Obnoví výšku vody ve widgetu během směny. */
+class WidgetLevelWorker(ctx: Context, params: androidx.work.WorkerParameters) : androidx.work.CoroutineWorker(ctx, params) {
+    override suspend fun doWork(): Result {
+        runCatching { DochazkaWidget.updateAll(applicationContext) }
+        return Result.success()
     }
 }

@@ -255,6 +255,37 @@ class ScreenshotTests {
     @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
     fun stageWander() = stage("18_prochazka", cz.kutil.dochazka.ui.Act.WANDER, listOf(2f, 5f, 8f))
 
+    /** Widget na plochu: doma (kape), v práci (teče, nádoba se plní), přesčas (přetéká). */
+    @Test
+    @Config(qualifiers = "w412dp-h915dp-xxhdpi")
+    fun widgetWater() {
+        val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+        val now = System.currentTimeMillis()
+        val col = android.widget.LinearLayout(activity).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setBackgroundColor(0xFF2B3A4E.toInt())
+            setPadding(30, 30, 30, 30)
+        }
+        val d = activity.resources.displayMetrics.density
+        for (st in listOf(
+            cz.kutil.dochazka.widget.QuickStatus(false, "", 312, 0, 0),
+            cz.kutil.dochazka.widget.QuickStatus(true, "07:00", 0, 0, 0, startMs = now - 3 * 3_600_000L),
+            cz.kutil.dochazka.widget.QuickStatus(true, "06:00", 0, 0, 0, startMs = now - 9 * 3_600_000L),
+        )) {
+            val rv = cz.kutil.dochazka.widget.DochazkaWidget.build(activity, st, now)
+            val v = rv.apply(activity, col)
+            col.addView(v, android.widget.LinearLayout.LayoutParams((330 * d).toInt(), (190 * d).toInt()).apply { bottomMargin = (20 * d).toInt() })
+        }
+        activity.setContentView(col)
+        repeat(10) { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(60)) }
+        val view = activity.window.decorView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bmp))
+        val dir = File("build/screenshots").apply { mkdirs() }
+        val small = Bitmap.createScaledBitmap(bmp, bmp.width * 6 / 10, bmp.height * 6 / 10, true)
+        File(dir, "27_widget.jpg").outputStream().use { small.compress(Bitmap.CompressFormat.JPEG, 82, it) }
+    }
+
     /**
      * Ukázkové video (snímky 24/s) – běží jen když je nastavené MAKE_VIDEO=1.
      * Přehled v přesčasu: přetéká nádoba, kape kohoutek a Kutil hraje dvě scénky.

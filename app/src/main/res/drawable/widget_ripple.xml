@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector android:width="64dp" android:height="16dp" android:viewportWidth="64" android:viewportHeight="16">
+            <group android:name="r0" android:pivotX="32" android:pivotY="8"><path android:name="p0" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.2" android:strokeAlpha="0" android:pathData="M2,8 A30,6 0 1 0 62,8 A30,6 0 1 0 2,8 Z" /></group><group android:name="r1" android:pivotX="32" android:pivotY="8"><path android:name="p1" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.2" android:strokeAlpha="0" android:pathData="M2,8 A30,6 0 1 0 62,8 A30,6 0 1 0 2,8 Z" /></group>
+        </vector>
+    </aapt:attr>
+    <target android:name="r0">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="2400" android:repeatCount="infinite" android:repeatMode="restart">
+                <propertyValuesHolder android:propertyName="scaleX" android:valueType="floatType"><keyframe android:fraction="0" android:value="0.15" /><keyframe android:fraction="0.85" android:value="0.15" /><keyframe android:fraction="1.0" android:value="1" android:interpolator="@android:anim/decelerate_interpolator" /><keyframe android:fraction="1" android:value="1" /></propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+    <target android:name="r0">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="2400" android:repeatCount="infinite" android:repeatMode="restart">
+                <propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType"><keyframe android:fraction="0" android:value="0.15" /><keyframe android:fraction="0.85" android:value="0.15" /><keyframe android:fraction="1.0" android:value="1" android:interpolator="@android:anim/decelerate_interpolator" /><keyframe android:fraction="1" android:value="1" /></propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+    <target android:name="p0">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="2400" android:repeatCount="infinite" android:repeatMode="restart">
+                <propertyValuesHolder android:propertyName="strokeAlpha" android:valueType="floatType"><keyframe android:fraction="0" android:value="0" /><keyframe android:fraction="0.85" android:value="0" /><keyframe android:fraction="0.86" android:value="0.9" /><keyframe android:fraction="1.0" android:value="0" /><keyframe android:fraction="1" android:value="0" /></propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+    <target android:name="r1">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="2400" android:repeatCount="infinite" android:repeatMode="restart">
+                <propertyValuesHolder android:propertyName="scaleX" android:valueType="floatType"><keyframe android:fraction="0" android:value="0.15" /><keyframe android:fraction="0.92" android:value="0.15" /><keyframe android:fraction="1.0" android:value="1" android:interpolator="@android:anim/decelerate_interpolator" /><keyframe android:fraction="1" android:value="1" /></propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+    <target android:name="r1">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="2400" android:repeatCount="infinite" android:repeatMode="restart">
+                <propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType"><keyframe android:fraction="0" android:value="0.15" /><keyframe android:fraction="0.92" android:value="0.15" /><keyframe android:fraction="1.0" android:value="1" android:interpolator="@android:anim/decelerate_interpolator" /><keyframe android:fraction="1" android:value="1" /></propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+    <target android:name="p1">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="2400" android:repeatCount="infinite" android:repeatMode="restart">
+                <propertyValuesHolder android:propertyName="strokeAlpha" android:valueType="floatType"><keyframe android:fraction="0" android:value="0" /><keyframe android:fraction="0.92" android:value="0" /><keyframe android:fraction="0.93" android:value="0.9" /><keyframe android:fraction="1.0" android:value="0" /><keyframe android:fraction="1" android:value="0" /></propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+</animated-vector>

@@ -61,7 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.compose.runtime.withFrameMillis
+import androidx.compose.runtime.withFrameNanos
 import cz.kutil.dochazka.R
 import cz.kutil.dochazka.data.AppPrefs
 import kotlinx.coroutines.delay
@@ -100,23 +100,22 @@ object WaterClockDebug {
 }
 
 @Composable
-fun rememberWaterClock(enabled: Boolean, fps: Int = 30): State<Float> {
+fun rememberWaterClock(enabled: Boolean): State<Float> {
     WaterClockDebug.manual?.let { return it }
     val t = remember { mutableFloatStateOf(0f) }
     val owner = LocalLifecycleOwner.current
     LaunchedEffect(enabled, owner) {
         if (!enabled) return@LaunchedEffect
         owner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            val frame = 1000L / fps
+            // každý snímek displeje (60 Hz, na 120Hz displeji i 120 snímků za sekundu)
             var last = -1L
             var acc = t.floatValue
             while (true) {
-                withFrameMillis { ms ->
-                    if (last >= 0) acc += min(ms - last, 100L) / 1000f
-                    last = ms
+                withFrameNanos { ns ->
+                    if (last >= 0) acc += min(ns - last, 100_000_000L) / 1_000_000_000f
+                    last = ns
                     t.floatValue = acc
                 }
-                delay(if (acc < WaterClockBoost.until) 1000L / 60 - 8 else frame - 8)
             }
         }
     }
