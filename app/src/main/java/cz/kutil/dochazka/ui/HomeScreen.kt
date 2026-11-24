@@ -130,6 +130,7 @@ fun HomeScreen(
     val water = rememberWaterState(open != null, animate)
     val dripSync = remember { DripSync() }
     val panelBounds = remember { PanelBounds() }
+    val drainBounds = remember { PanelBounds() }
     val soundsOn = animate && remember(resumeTick) { soundsEnabled(context) }
     val sounds = rememberWaterSounds(soundsOn)
     val gagOn = animate && remember(resumeTick) { AppPrefs.plumberGag(context) }
@@ -145,8 +146,6 @@ fun HomeScreen(
 
     Box(Modifier.fillMaxSize()) {
     SidePipes(clock, water, animate)
-    // pevná vpusť na dně obrazovky (pod obsahem – při posouvání zůstává na místě)
-    OverflowOverlay(clock, overflowing = open != null && worked > 8 * 3_600_000L, animate = animate, panel = panelBounds, modifier = Modifier.fillMaxSize(), drainOnly = true)
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -373,11 +372,12 @@ fun HomeScreen(
                 Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = "Stav sledování", tint = Ind.onBgDim)
             }
         }
-        // místo dole, aby šel obsah odrolovat nad vpusť a Kutilovo jeviště
-        Spacer(Modifier.height(if (gagOn) StageHeight - 40.dp else 70.dp))
+        // vpusť na konci stránky (posouvá se s obsahem jako podlaha)
+        DrainFloor(clock, overflowing = open != null && worked > 8 * 3_600_000L, animate = animate, bounds = drainBounds)
+        Spacer(Modifier.height(if (gagOn) 40.dp else 10.dp))
     }
     // v přesčasu stéká voda z nádoby přes celou obrazovku do vpusti
-    OverflowOverlay(clock, overflowing = open != null && worked > 8 * 3_600_000L, animate = animate, panel = panelBounds, modifier = Modifier.fillMaxSize())
+    OverflowOverlay(clock, overflowing = open != null && worked > 8 * 3_600_000L, animate = animate, panel = panelBounds, modifier = Modifier.fillMaxSize(), drainAt = drainBounds)
     // Kutil sám chodí po spodní části přehledu a střídá scénky (doteky propouští k tlačítkům)
     if (gagOn) {
         PlumberStage(

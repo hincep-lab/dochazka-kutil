@@ -532,6 +532,8 @@ class PanelBounds { var rect by androidx.compose.runtime.mutableStateOf<Rect?>(n
 @Composable
 fun OverflowOverlay(
     clock: State<Float>, overflowing: Boolean, animate: Boolean, panel: PanelBounds, modifier: Modifier = Modifier,
+    /** Kde je vpusť (na konci stránky); null = pod okrajem obrazovky. */
+    drainAt: PanelBounds? = null,
     /** true = jen pevná vpusť na dně (kreslí se pod obsahem), false = jen stékající voda (nad obsahem). */
     drainOnly: Boolean = false,
 ) {
@@ -545,13 +547,15 @@ fun OverflowOverlay(
         val u = density
         val r = panel.rect?.let { Rect(it.left - origin.x, it.top - origin.y, it.right - origin.x, it.bottom - origin.y) }
             ?: Rect(0f, 0f, size.width, size.height * 0.3f)
-        val drain = Offset(size.width / 2, size.height - 22 * u)
+        // vpusť je na konci stránky: když není vidět, voda stéká pod spodní okraj obrazovky
+        val dr = drainAt?.rect
+        val drain = if (dr != null) Offset(dr.center.x - origin.x, dr.center.y - origin.y) else Offset(size.width / 2, size.height + 60 * u)
         val startY = r.bottom.coerceIn(0f, size.height * 0.8f)
         val water = Color(0xFF6CC4FF)
         // pramínky: od rohů nádoby dolů a pak do vpusti (jen při přesčasu)
         if (!drainOnly && k > 0.01f) for ((i, x0) in listOf(r.left + 6 * u, r.right - 6 * u).withIndex()) {
             if (i == 2 && k < 0.6f) continue
-            val bottom = size.height - 46 * u - i * 6 * u
+            val bottom = min(size.height + 40 * u, drain.y - 24 * u) - i * 6 * u
             val path = Path().apply {
                 moveTo(x0, startY)
                 // lehké vlnění pramínku
@@ -602,3 +606,35 @@ fun OverflowOverlay(
     }
 }
 
+
+
+/** Vpusť na konci stránky (podlaha přehledu); v přesčasu kolem ní louže a vír. */
+@Composable
+fun DrainFloor(clock: State<Float>, overflowing: Boolean, animate: Boolean, bounds: PanelBounds, modifier: Modifier = Modifier) {
+    val k by animateFloatAsState(if (overflowing) 1f else 0f, tween(if (animate) 2200 else 0), label = "drainWater")
+    val grate = ImageBitmap.imageResource(R.drawable.g_odtokova_mrizka)
+    Canvas(modifier.fillMaxWidth().height(90.dp).onGloballyPositioned { bounds.rect = it.boundsInRoot() }) {
+        val u = density
+        val t = if (animate) clock.value else 0f
+        val c = Offset(size.width / 2, size.height / 2)
+        if (k > 0.01f) {
+            drawOval(
+                Brush.radialGradient(listOf(Color(0x9954B6FF), Color(0x3340A0FF), Color.Transparent), center = c, radius = 90 * u * k),
+                Offset(c.x - 90 * u * k, c.y - 18 * u * k), Size(180 * u * k, 36 * u * k),
+            )
+            for (j in 0 until 3) {
+                val rw = (30f + j * 12f) * u
+                rotate(t * (120f - j * 25f) + j * 80f, c) {
+                    drawArc(Color.White.copy(alpha = (0.45f - j * 0.1f) * k), 0f, 100f, false, Offset(c.x - rw, c.y - rw * 0.35f), Size(rw * 2, rw * 0.7f), style = Stroke(1.5f * u))
+                }
+            }
+        }
+        val gw = 64 * u
+        val gh = gw * grate.height / grate.width
+        drawImage(
+            grate, srcOffset = androidx.compose.ui.unit.IntOffset.Zero, srcSize = androidx.compose.ui.unit.IntSize(grate.width, grate.height),
+            dstOffset = androidx.compose.ui.unit.IntOffset((c.x - gw / 2).toInt(), (c.y - gh / 2).toInt()),
+            dstSize = androidx.compose.ui.unit.IntSize(gw.toInt(), gh.toInt()),
+        )
+    }
+}
