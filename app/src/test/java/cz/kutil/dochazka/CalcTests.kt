@@ -256,3 +256,40 @@ class LongShiftTest {
         assertTrue(ls.exceeds(12 * h, 0, 12))
     }
 }
+
+class AnomaliesTest {
+    private fun t(d: Int, h: Int, m: Int = 0): Instant = LocalDateTime.of(2026, 11, d, h, m).atZone(PRAGUE).toInstant()
+    private val A = cz.kutil.dochazka.core.Anomalies
+
+    @Test fun bezProblemu() {
+        val shifts = (16..20).map { ShiftData(it.toLong(), t(it, 7), t(it, 15, 30)) }
+        assertTrue(A.find(t(23, 8), shifts, emptyMap<LocalDate, Any>(), 0, 12).isEmpty()) // 21.–22. je víkend
+    }
+
+    @Test fun chybejiciDnyOdPrvnihoZaznamuASvatekSeNepocita() {
+        // první záznam 16. 11.; 17. 11. svátek; 18. dovolená; 19. a 20. nic
+        val shifts = listOf(ShiftData(1, t(16, 7), t(16, 15, 30)))
+        val r = A.find(t(23, 8), shifts, mapOf(LocalDate.of(2026, 11, 18) to "D"), 0, 12)
+        val m = r.single { it.kind == cz.kutil.dochazka.core.AnomalyKind.MISSING_RECORD }
+        assertEquals("Chybí záznam za 2 pracovní dny", m.title)
+        assertTrue(m.detail.startsWith("19. 11., 20. 11."))
+        assertEquals(LocalDate.of(2026, 11, 19), m.date)
+    }
+
+    @Test fun zapomenuteUkonceniPrekryvDlouhaSmenaANavrhy() {
+        val shifts = listOf(
+            ShiftData(1, t(19, 7), t(19, 15, 30)),
+            ShiftData(2, t(19, 15), t(19, 17)),          // překryv 15:00–15:30
+            ShiftData(3, t(20, 5), t(20, 21)),           // 16 h
+            ShiftData(4, t(23, 6, 50), null),            // běží od rána
+        )
+        val r = A.find(t(23, 19), shifts, emptyMap<LocalDate, Any>(), 2, 12)
+        val kinds = r.map { it.kind }
+        assertEquals(listOf(cz.kutil.dochazka.core.AnomalyKind.FORGOTTEN_END, cz.kutil.dochazka.core.AnomalyKind.PENDING_GPS, cz.kutil.dochazka.core.AnomalyKind.OVERLAP, cz.kutil.dochazka.core.AnomalyKind.LONG_SHIFT), kinds.filter { it != cz.kutil.dochazka.core.AnomalyKind.MISSING_RECORD })
+        assertEquals("Směna běží už 12 h", r.first().title)
+        assertEquals("2 události čekají na potvrzení", r[1].title)
+        assertEquals(LocalDate.of(2026, 11, 19), r.first { it.kind == cz.kutil.dochazka.core.AnomalyKind.OVERLAP }.date)
+        // ráno téhož dne ještě nic
+        assertTrue(A.find(t(23, 10), listOf(shifts[3]), emptyMap<LocalDate, Any>(), 0, 12).none { it.kind == cz.kutil.dochazka.core.AnomalyKind.FORGOTTEN_END })
+    }
+}

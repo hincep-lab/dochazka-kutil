@@ -9,7 +9,7 @@ plugins {
 val buildNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
 
 // Hlavní číslo verze aplikace (viditelné v Nastavení a v názvu APK).
-val appVersion = "9"
+val appVersion = "10"
 
 android {
     namespace = "cz.kutil.dochazka"

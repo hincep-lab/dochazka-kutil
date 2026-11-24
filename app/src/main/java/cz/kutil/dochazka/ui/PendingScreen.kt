@@ -40,8 +40,8 @@ import cz.kutil.dochazka.track.Notifier
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
-val OkGreen = Color(0xFF2E7D32)
-val WarnOrange = Color(0xFFEF6C00)
+val OkGreen = Color(0xFF6EE27F)
+val WarnOrange = Color(0xFFF5B841)
 
 fun eventTypeText(p: PendingEventEntity): String = when {
     p.type == "END" -> "Návrat domů"

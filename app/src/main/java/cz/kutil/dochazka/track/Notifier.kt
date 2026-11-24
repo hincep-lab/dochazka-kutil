@@ -28,6 +28,8 @@ object Notifier {
     const val EXTRA_YES = "yes"
     const val EXTRA_OPEN_TAB = "open_tab"
     const val CHANNEL_DONE = "answer_done"
+    /** Oranžová firemní barva (ikona a tlačítka oznámení). */
+    private const val ACCENT = 0xFFF59E1B.toInt()
     const val CHANNEL_STATUS = "work_status"
     private const val STATUS_ID = 505
 
@@ -56,6 +58,8 @@ object Notifier {
         val builder = NotificationCompat.Builder(ctx, CHANNEL_STATUS)
             .setSmallIcon(R.drawable.ic_notif)
             .setContentTitle("V práci od ${time(reportStartMs)}")
+            .setColor(0xFF3AA34C.toInt())
+            .setColorized(false)
             .setContentText(text)
             .setShowWhen(false)
             .setOngoing(true)
@@ -192,10 +196,19 @@ object Notifier {
         else -> "Začal jsi pracovat?"
     }
 
+    /** Den jen tehdy, když to není dnešek – oznámení má být krátké. */
+    private fun dayPrefix(ms: Long): String {
+        val d = java.time.Instant.ofEpochMilli(ms).atZone(PRAGUE).toLocalDate()
+        return if (d == java.time.LocalDate.now(PRAGUE)) "" else "${day(ms)} "
+    }
+
+    private fun rounded(ms: Long): String =
+        time(cz.kutil.dochazka.core.Rounding.roundToHalfHour(java.time.Instant.ofEpochMilli(ms)).toEpochMilli())
+
     fun detail(p: PendingEventEntity): String = when {
-        p.type == "END" -> "Návrat domů zaznamenán ${day(p.effectiveAt)} v ${time(p.effectiveAt)}."
-        p.pairedEndAt != null -> "Mimo domov ${day(p.effectiveAt)} ${time(p.effectiveAt)}–${time(p.pairedEndAt)}. Zapsat jako práci?"
-        else -> "Odchod z domova zaznamenán ${day(p.effectiveAt)} v ${time(p.effectiveAt)}."
+        p.type == "END" -> "Návrat ${dayPrefix(p.effectiveAt)}v ${time(p.effectiveAt)} · do výkazu ${rounded(p.effectiveAt)}"
+        p.pairedEndAt != null -> "Mimo domov ${dayPrefix(p.effectiveAt)}${time(p.effectiveAt)}–${time(p.pairedEndAt)} · zapsat jako práci?"
+        else -> "Odchod ${dayPrefix(p.effectiveAt)}v ${time(p.effectiveAt)} · do výkazu ${rounded(p.effectiveAt)}"
     }
 
     fun show(ctx: Context, p: PendingEventEntity) {
@@ -211,7 +224,8 @@ object Notifier {
             .setSmallIcon(R.drawable.ic_notif)
             .setContentTitle(title(p))
             .setContentText(detail(p))
-            .setStyle(NotificationCompat.BigTextStyle().bigText(detail(p) + " Čas půjde v aplikaci upravit."))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(detail(p)))
+            .setColor(ACCENT)
             .setWhen(p.effectiveAt)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setShowWhen(true)

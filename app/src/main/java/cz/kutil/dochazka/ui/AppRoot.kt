@@ -5,7 +5,9 @@ package cz.kutil.dochazka.ui
 import android.content.ClipData
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,7 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -26,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -62,7 +66,7 @@ private fun StatusPill(state: UiState) {
         state.demo -> Triple("DEMO", scheme.tertiaryContainer, scheme.onTertiaryContainer)
         open != null -> {
             val start = open.editedStart ?: Rounding.roundToHalfHour(Instant.ofEpochMilli(open.rawStart)).toEpochMilli()
-            Triple("V práci od ${Fmt.time(start)}", scheme.primary, scheme.onPrimary)
+            Triple("V práci od ${Fmt.time(start)}", Ind.green, Color.White)
         }
         state.openPending.isNotEmpty() -> Triple("Čeká dotaz", scheme.errorContainer, scheme.onErrorContainer)
         !state.settings.trackingEnabled -> Triple("Ruční režim", scheme.surfaceVariant, scheme.onSurfaceVariant)
@@ -82,7 +86,7 @@ private fun StatusPill(state: UiState) {
     }
 }
 
-enum class Tab(val label: String) { HOME("Dnes"), MONTH("Měsíc"), PENDING("K potvrzení"), SETTINGS("Nastavení") }
+enum class Tab(val label: String) { HOME("Přehled"), CALENDAR("Kalendář"), MONTH("Výkaz"), PENDING("Potvrdit"), SETTINGS("Více") }
 
 @Composable
 fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
@@ -183,16 +187,21 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
         if (endDialog && openShift == null) endDialog = false
     }
 
+    val showTopBar = detail != null || diag || tab != Tab.HOME
     Scaffold(
+        containerColor = Color.Transparent,
+        modifier = Modifier.background(IndustrialBackground),
         topBar = {
+            if (showTopBar) {
             val today = Fmt.today()
             val (title, subtitle) = when {
                 detail != null -> "${Fmt.dowLong(detail).replaceFirstChar { it.uppercase() }} ${Fmt.date(detail)}" to "Detail dne"
                 diag -> "Stav sledování" to "Diagnostika"
                 tab == Tab.HOME -> "Docházka Kutil" to "${Fmt.dowLong(today)} ${Fmt.date(today)}"
-                tab == Tab.MONTH -> "Přehled měsíce" to state.settings.employee
+                tab == Tab.CALENDAR -> "Kalendář" to "Pracovní dny a nepřítomnosti"
+                tab == Tab.MONTH -> "Výkaz" to "Měsíční přehled a export do Wordu / PDF"
                 tab == Tab.PENDING -> "K potvrzení" to "Nevyřízeno: ${state.openPending.size}"
-                else -> "Nastavení" to state.settings.organization
+                else -> "Nastavení a další" to state.settings.organization
             }
             TopAppBar(
                 navigationIcon = {
@@ -215,11 +224,12 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
                     }
                 },
                 actions = { StatusPill(state) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Ind.bgTop, titleContentColor = Ind.text, navigationIconContentColor = Ind.text),
             )
+            }
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(containerColor = Ind.bgDeep, contentColor = Ind.textDim, tonalElevation = 0.dp) {
                 for (t in Tab.entries) {
                     NavigationBarItem(
                         selected = tab == t && detail == null && !diag,
@@ -231,8 +241,9 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
                         icon = {
                             val icon = when (t) {
                                 Tab.HOME -> Icons.Filled.Home
-                                Tab.MONTH -> Icons.Filled.DateRange
-                                Tab.PENDING -> Icons.Filled.Notifications
+                                Tab.CALENDAR -> Icons.Filled.DateRange
+                                Tab.MONTH -> Icons.AutoMirrored.Filled.List
+                                Tab.PENDING -> Icons.Filled.CheckCircle
                                 Tab.SETTINGS -> Icons.Filled.Settings
                             }
                             val count = state.openPending.size
@@ -242,7 +253,14 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
                                 Icon(icon, contentDescription = t.label)
                             }
                         },
-                        label = { Text(t.label) },
+                        label = { Text(t.label, fontWeight = FontWeight.SemiBold) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Ind.onOrange,
+                            selectedTextColor = Ind.orange,
+                            indicatorColor = Ind.orange,
+                            unselectedIconColor = Ind.textDim,
+                            unselectedTextColor = Ind.textDim,
+                        ),
                     )
                 }
             }
@@ -263,6 +281,7 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
                         onEndWork = { endDialog = true },
                         onOpenDiag = { diag = true },
                     )
+                    Tab.CALENDAR -> CalendarScreen(vm, state, onOpenDay = { detailDate = it.toString() })
                     Tab.MONTH -> MonthScreen(vm, state, onOpenDay = { detailDate = it.toString() })
                     Tab.PENDING -> PendingScreen(vm, state, onOpenDay = { detailDate = it.toString() })
                     Tab.SETTINGS -> SettingsScreen(vm, state, onOpenDiag = { diag = true })

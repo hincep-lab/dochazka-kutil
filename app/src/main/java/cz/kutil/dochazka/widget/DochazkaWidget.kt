@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import android.view.View
 import android.widget.RemoteViews
 import cz.kutil.dochazka.R
@@ -58,10 +59,29 @@ class DochazkaWidget : AppWidgetProvider() {
             if (ids.isEmpty()) return
             val s = QuickActions.status(app)
             val views = RemoteViews(app.packageName, R.layout.widget_dochazka)
-            views.setTextViewText(R.id.w_status, if (s.working) "V práci od ${s.sinceText}" else "Nejsi v práci")
-            views.setTextViewText(R.id.w_today, "Dnes ${WorkCalc.formatHm(s.todayMinutes)} h")
-            views.setTextViewText(R.id.w_month, "Měsíc ${WorkCalc.formatHm(s.monthMinutes)} h")
-            views.setTextViewText(R.id.w_button, if (s.working) "Ukončit práci" else "Začít práci")
+            val start = s.startMs
+            if (s.working && start != null) {
+                views.setTextViewText(R.id.w_status, "PRÁVĚ PRACUJEŠ")
+                views.setInt(R.id.w_status_bar, "setBackgroundResource", R.drawable.widget_status_working)
+                views.setTextViewText(R.id.w_start, "Začátek ${s.sinceText}")
+                // Živý časovač počítá sám launcher – aplikace kvůli němu nemusí běžet ani widget obnovovat.
+                val base = SystemClock.elapsedRealtime() - (System.currentTimeMillis() - start)
+                views.setChronometer(R.id.w_timer, base, null, true)
+                views.setViewVisibility(R.id.w_timer, View.VISIBLE)
+                views.setViewVisibility(R.id.w_today, View.GONE)
+                views.setTextViewText(R.id.w_button, "Ukončit práci")
+                views.setInt(R.id.w_button, "setBackgroundResource", R.drawable.widget_button_stop)
+            } else {
+                views.setTextViewText(R.id.w_status, if (s.pending > 0) "ČEKÁ NA POTVRZENÍ" else "DOMA")
+                views.setInt(R.id.w_status_bar, "setBackgroundResource", if (s.pending > 0) R.drawable.widget_status_pending else R.drawable.widget_status_idle)
+                views.setTextViewText(R.id.w_start, "Dnes odpracováno")
+                views.setChronometer(R.id.w_timer, SystemClock.elapsedRealtime(), null, false)
+                views.setViewVisibility(R.id.w_timer, View.GONE)
+                views.setViewVisibility(R.id.w_today, View.VISIBLE)
+                views.setTextViewText(R.id.w_today, "${WorkCalc.formatHm(s.todayMinutes)} h")
+                views.setTextViewText(R.id.w_button, "Začít práci")
+                views.setInt(R.id.w_button, "setBackgroundResource", R.drawable.widget_button_go)
+            }
             if (s.pending > 0) {
                 views.setViewVisibility(R.id.w_pending, View.VISIBLE)
                 views.setTextViewText(R.id.w_pending, "K potvrzení: ${s.pending}")

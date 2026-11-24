@@ -19,6 +19,8 @@ data class QuickStatus(
     val todayMinutes: Long,
     val monthMinutes: Long,
     val pending: Int,
+    /** Začátek běžící směny pro výkaz (zaokrouhlený nebo ručně opravený), jinak null. */
+    val startMs: Long? = null,
 )
 
 object QuickActions {
@@ -46,6 +48,7 @@ object QuickActions {
             todayMinutes = todayMin,
             monthMinutes = monthMin,
             pending = dao.openPending().count { !it.deferred },
+            startMs = open?.let { it.editedStart ?: Rounding.roundToHalfHour(Instant.ofEpochMilli(it.rawStart)).toEpochMilli() },
         )
     }
 

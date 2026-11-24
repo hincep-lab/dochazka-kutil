@@ -2,7 +2,7 @@ name: Android APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, "design/**"]
   workflow_dispatch:
 
 permissions:
@@ -84,6 +84,7 @@ jobs:
           path: out/*.apk
 
       - name: Vydání (Release) s APK ke stažení
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -91,3 +92,16 @@ jobs:
             --title "Docházka Kutil – verze ${APP_VERSION} (sestavení ${{ github.run_number }})" \
             --notes "Automatické sestavení z commitu ${{ github.sha }}. Stáhni soubor .apk níže a nainstaluj ho v telefonu." \
             --latest
+
+      - name: Testovací verze z vývojové větve (předběžné vydání)
+        # Z vývojové větve vzniká jen „Pre-release“: kontrola aktualizací v aplikaci ho nenabízí
+        # a hlavní vydání (Latest) zůstává beze změny.
+        if: github.ref != 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "test-${{ github.run_number }}" out/*.apk \
+            --target "${{ github.sha }}" \
+            --prerelease \
+            --title "TESTOVACÍ verze ${APP_VERSION} – ${{ github.ref_name }} (sestavení ${{ github.run_number }})" \
+            --notes "Testovací sestavení z větve ${{ github.ref_name }} (commit ${{ github.sha }}). Není v hlavní větvi main."
