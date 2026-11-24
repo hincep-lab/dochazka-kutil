@@ -18,7 +18,7 @@ class UpdateWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         val app = applicationContext
         if (!AppPrefs.autoUpdateCheck(app)) return Result.success()
         val rel = try {
-            Updater.latest()
+            Updater.latest(Updater.installedBuild(applicationContext))
         } catch (e: Exception) {
             return Result.success()
         } ?: return Result.success()

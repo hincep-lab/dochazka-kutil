@@ -34,7 +34,7 @@ data class ReleaseInfo(
  */
 object Updater {
     const val REPO = "hincep-lab/dochazka-kutil"
-    private const val API = "https://api.github.com/repos/$REPO/releases/latest"
+    private const val API = "https://api.github.com/repos/$REPO/releases?per_page=30"
     private val APK_RE = Regex("DochazkaKutil-v([0-9.]+)-(\\d+)\\.apk")
 
     fun installedBuild(ctx: Context): Int = try {
@@ -76,14 +76,35 @@ object Updater {
         return c
     }
 
-    suspend fun latest(): ReleaseInfo? = withContext(Dispatchers.IO) {
+    /**
+     * Nejnovější vydání pro tuto instalaci.
+     * Běžně jen hlavní vydání. Kdo má nainstalovanou testovací verzi (vyšší číslo sestavení než
+     * poslední hlavní vydání), dostává i další testovací verze – jinak by jeho aktualizace „zamrzly“.
+     */
+    suspend fun latest(installed: Int): ReleaseInfo? = withContext(Dispatchers.IO) {
         val c = open(API)
         try {
             if (c.responseCode != 200) throw IOException("GitHub odpověděl kódem ${c.responseCode}.")
-            parse(c.inputStream.bufferedReader().use { it.readText() })
+            pick(c.inputStream.bufferedReader().use { it.readText() }, installed)
         } finally {
             c.disconnect()
         }
+    }
+
+    /** Výběr z výpisu vydání (testovatelné bez sítě). */
+    fun pick(json: String, installed: Int): ReleaseInfo? {
+        val arr = org.json.JSONArray(json)
+        var stable: ReleaseInfo? = null
+        var any: ReleaseInfo? = null
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            if (o.optBoolean("draft")) continue
+            val r = parse(o.toString()) ?: continue
+            if (any == null || r.build > any.build) any = r
+            if (!o.optBoolean("prerelease") && (stable == null || r.build > stable.build)) stable = r
+        }
+        val onTest = stable == null || installed > stable.build
+        return if (onTest) any else stable
     }
 
     /** Stáhne APK do mezipaměti a ověří otisk. progress: 0..1 (nebo -1, když velikost není známá). */

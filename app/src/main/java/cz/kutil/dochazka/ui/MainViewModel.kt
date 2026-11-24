@@ -409,7 +409,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun checkUpdate() = launchSafe {
         update.value = UpdateState.Checking
         update.value = try {
-            val rel = Updater.latest()
+            val rel = Updater.latest(Updater.installedBuild(getApplication()))
             when {
                 rel == null -> UpdateState.Failed("Na GitHubu není žádné vydání s APK.")
                 rel.build > Updater.installedBuild(ctx) -> UpdateState.Available(rel)

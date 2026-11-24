@@ -306,4 +306,16 @@ class DatabaseTests {
         assertNull(cz.kutil.dochazka.update.Updater.parse("""{"assets":[{"name":"DochazkaKutil-7.apk","browser_download_url":"x"}]}"""))
         assertNull(cz.kutil.dochazka.update.Updater.parse("""{"assets":[]}"""))
     }
+
+    @Test
+    fun aktualizaceTestovacichVerzi() {
+        fun rel(tag: String, build: Int, pre: Boolean) =
+            """{"tag_name":"$tag","prerelease":$pre,"assets":[{"name":"DochazkaKutil-v10-$build.apk","browser_download_url":"https://x/$build"}]}"""
+        val json = "[" + listOf(rel("test-47", 47, true), rel("test-45", 45, true), rel("build-21", 21, false), rel("build-20", 20, false)).joinToString(",") + "]"
+        // hlavní verze: testovací se nenabízí
+        assertEquals(21, cz.kutil.dochazka.update.Updater.pick(json, 20)!!.build)
+        assertEquals(21, cz.kutil.dochazka.update.Updater.pick(json, 21)!!.build)
+        // nainstalovaná testovací verze: nabídne se novější testovací
+        assertEquals(47, cz.kutil.dochazka.update.Updater.pick(json, 45)!!.build)
+    }
 }
