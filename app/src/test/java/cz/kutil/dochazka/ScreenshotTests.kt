@@ -245,6 +245,7 @@ class ScreenshotTests {
         val manualClock = androidx.compose.runtime.mutableFloatStateOf(0f)
         cz.kutil.dochazka.ui.WaterClockDebug.manual = manualClock
         cz.kutil.dochazka.ui.SoundTap.listener = { name -> println("SOUND_EVENT $frame $name") }
+        cz.kutil.dochazka.ui.PlumberDebug.log = { m -> if (frame % 48 == 0 || m.startsWith("act") || m.startsWith("director")) println("DBG $frame $m") }
         val state = craftedState(open = true, pending = false, hoursAgo = 8.1)
         val vm = MainViewModel(ApplicationProvider.getApplicationContext())
         val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()

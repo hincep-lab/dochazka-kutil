@@ -74,6 +74,7 @@ private fun eventsOf(a: Act): List<Pair<Float, GagSound>> = when (a) {
 /** Jen pro natáčení ukázkového videa v testech: pevné pořadí scének bez procházek. */
 object PlumberDebug {
     @Volatile var forcedOrder: List<Act>? = null
+    @Volatile var log: ((String) -> Unit)? = null
 }
 
 /** Výška jeviště (spodní část přehledu). */
@@ -99,6 +100,7 @@ fun PlumberStage(
     val smoother = remember { PoseSmoother() }
     // režisér: scénky se střídají samy, mezi nimi se Kutil občas jen projde
     LaunchedEffect(animate, fixedAct, working, night) {
+        PlumberDebug.log?.invoke("director animate=$animate working=$working night=$night clock=${clock.value}")
         if (!animate || fixedAct != null) return@LaunchedEffect
         if (!working && PlumberDebug.forcedOrder == null) {
             // po práci: televize a pivo, v noci spánek – běží ve smyčce
@@ -121,6 +123,7 @@ fun PlumberStage(
             }
             sinceScene = if (next == Act.WANDER) 1 else 0
             act.intValue = next.ordinal
+            PlumberDebug.log?.invoke("act $next at $t")
             variant.intValue = (Math.random() * 3).toInt()
             start.floatValue = t
             nextAt = t + next.length + if (forced != null) 1f else 3f + (Math.random() * 6).toFloat()
