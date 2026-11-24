@@ -589,7 +589,7 @@ fun OverflowOverlay(clock: State<Float>, overflowing: Boolean, animate: Boolean,
         val startY = r.bottom.coerceIn(0f, size.height * 0.8f)
         val water = Color(0xFF6CC4FF)
         // pramínky: od rohů nádoby dolů a pak do vpusti
-        for ((i, x0) in listOf(r.left + 6 * u, r.right - 6 * u, r.left + r.width * 0.33f).withIndex()) {
+        for ((i, x0) in listOf(r.left + 6 * u, r.right - 6 * u).withIndex()) {
             if (i == 2 && k < 0.6f) continue
             val bottom = size.height - 46 * u - i * 6 * u
             val path = Path().apply {
