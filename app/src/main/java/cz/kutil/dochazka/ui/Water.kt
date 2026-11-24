@@ -111,11 +111,17 @@ fun rememberWaterClock(enabled: Boolean): State<Float> {
             var last = -1L
             var acc = t.floatValue
             while (true) {
+                var gap = 16_000_000L
                 withFrameNanos { ns ->
-                    if (last >= 0) acc += min(ns - last, 100_000_000L) / 1_000_000_000f
+                    if (last >= 0) {
+                        gap = ns - last
+                        acc += min(gap, 100_000_000L) / 1_000_000_000f
+                    }
                     last = ns
                     t.floatValue = acc
                 }
+                // pojistka: kdyby snímky chodily nepřirozeně rychle (testy, emulátor), nejvýš ~120 za sekundu
+                if (gap < 4_000_000L) delay(8)
             }
         }
     }
