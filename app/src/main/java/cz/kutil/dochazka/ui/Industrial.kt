@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -314,7 +313,7 @@ fun MetalCard(modifier: Modifier = Modifier, padding: Dp = 16.dp, content: @Comp
     SteelCard(modifier, padding, content = content)
 
 @Composable
-fun SectionTitle(text: String, icon: ImageVector? = null, trailing: (@Composable () -> Unit)? = null, @DrawableRes iconRes: Int? = null) {
+fun SectionTitle(text: String, icon: ImageVector? = null, @DrawableRes iconRes: Int? = null, trailing: (@Composable () -> Unit)? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         when {
             iconRes != null -> Icon(painterResource(iconRes), null, tint = Ind.orangeDeep, modifier = Modifier.size(24.dp))

@@ -311,7 +311,7 @@ fun HomeScreen(
     }
 }
 
-private fun hm(minutes: Int): String = "${minutes / 60} h ${"%02d".format(minutes % 60)} min"
+private fun hm(minutes: Long): String = "${minutes / 60} h ${"%02d".format(minutes % 60)} min"
 
 private fun placeText(state: UiState): String = when {
     state.demo -> "ukázková data"
