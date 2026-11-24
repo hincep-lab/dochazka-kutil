@@ -255,7 +255,7 @@ class ScreenshotTests {
         }
         println("VIDEO_ACT PIPE 2.5")
         println("VIDEO_ACT TUB 21.0")
-        val state = craftedState(open = true, pending = false, hoursAgo = 8.1)
+        val state = craftedState(open = true, pending = false, hoursAgo = 8.6)
         val vm = MainViewModel(ApplicationProvider.getApplicationContext())
         val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
         activity.setContent {

@@ -229,7 +229,7 @@ private fun poseWander(e: Float, t: Float, w: Float, u: Float, v: Int): Pose {
 private fun DrawScope.actPipe(e: Float, t: Float, floorY: Float, u: Float, fade: Float, pipes: PipeImages, sm: PoseSmoother) {
     val w = size.width
     val d = 20 * u
-    val pipeY = floorY - 132 * u
+    val pipeY = floorY - 108 * u
     val crackX = w * 0.5f
     withAlpha(fade) {
         val k = d / 64f
