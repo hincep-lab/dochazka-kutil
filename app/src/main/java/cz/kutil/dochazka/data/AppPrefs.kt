@@ -23,6 +23,10 @@ object AppPrefs {
     fun longShiftHours(ctx: Context): Int = prefs(ctx).getInt("long_shift_hours", 12).coerceIn(4, 24)
     fun setLongShiftHours(ctx: Context, hours: Int) = prefs(ctx).edit().putInt("long_shift_hours", hours.coerceIn(4, 24)).apply()
 
+    /** Trvalé oznámení „V práci od …“, dokud běží směna. */
+    fun statusNotification(ctx: Context): Boolean = prefs(ctx).getBoolean("status_notification", true)
+    fun setStatusNotification(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("status_notification", on).apply()
+
     fun backupReminder(ctx: Context): Boolean = prefs(ctx).getBoolean("backup_reminder", true)
     fun setBackupReminder(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("backup_reminder", on).apply()
 
@@ -72,11 +76,13 @@ object AppPrefs {
         .put("reportEmail", reportEmail(ctx))
         .put("longShiftHours", longShiftHours(ctx))
         .put("backupReminder", backupReminder(ctx))
+        .put("statusNotification", statusNotification(ctx))
 
     fun fromJson(ctx: Context, json: JSONObject) {
         if (json.has("monthlyReminder")) setReminderEnabled(ctx, json.optBoolean("monthlyReminder", true))
         if (json.has("reportEmail")) setReportEmail(ctx, json.optString("reportEmail", ""))
         if (json.has("longShiftHours")) setLongShiftHours(ctx, json.optInt("longShiftHours", 12))
+        if (json.has("statusNotification")) setStatusNotification(ctx, json.optBoolean("statusNotification", true))
         if (json.has("backupReminder")) setBackupReminder(ctx, json.optBoolean("backupReminder", true))
     }
 }

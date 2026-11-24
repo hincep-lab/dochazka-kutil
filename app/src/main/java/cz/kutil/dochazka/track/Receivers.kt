@@ -141,6 +141,7 @@ class ShiftActionReceiver : BroadcastReceiver() {
                 val open = Graph.realDb(app).dao().openShift()
                 Notifier.cancelLongShift(app)
                 if (open == null || open.id != shiftId) {
+                    TrackingEngine.refreshStatus(app)
                     Notifier.showDone(app, "Už vyřízeno", "Tato směna už je ukončená.")
                     return@async
                 }
@@ -171,6 +172,7 @@ class BootReceiver : BroadcastReceiver() {
                 if (!result.ok) TrackingEngine.diagnostic(app, "Po restartu se zónu nepodařilo obnovit: ${result.message}")
             }
             TrackingEngine.repostPending(app)
+            TrackingEngine.refreshStatus(app)
             LongShiftWorker.checkNow(app)
         }
     }

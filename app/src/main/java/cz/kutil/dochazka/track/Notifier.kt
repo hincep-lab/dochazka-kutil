@@ -28,6 +28,49 @@ object Notifier {
     const val EXTRA_YES = "yes"
     const val EXTRA_OPEN_TAB = "open_tab"
     const val CHANNEL_DONE = "answer_done"
+    const val CHANNEL_STATUS = "work_status"
+    private const val STATUS_ID = 505
+
+    /**
+     * Trvalé oznámení po celou dobu směny: „V práci od 7:00“ s běžícími hodinami a tlačítkem
+     * pro ukončení přímo v oznámení. Zmizí, jakmile se směna ukončí.
+     */
+    fun showWorking(ctx: Context, shiftId: Long, rawStartMs: Long, reportStartMs: Long, returnAtMs: Long?) {
+        if (!canNotify(ctx)) return
+        ensureChannel(ctx)
+        val open = PendingIntent.getActivity(
+            ctx, STATUS_ID,
+            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        fun endAt(code: Int, at: Long?) = PendingIntent.getBroadcast(
+            ctx, STATUS_ID * 10 + code,
+            Intent(ctx, ShiftActionReceiver::class.java).setAction(ACTION_END_AT)
+                .putExtra(EXTRA_SHIFT_ID, shiftId).putExtra(EXTRA_END_AT, at ?: -1L),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val text = "Zaznamenáno ${day(rawStartMs)} v ${time(rawStartMs)}" +
+            (returnAtMs?.let { " · návrat domů v ${time(it)}" } ?: "")
+        val builder = NotificationCompat.Builder(ctx, CHANNEL_STATUS)
+            .setSmallIcon(R.drawable.ic_notif)
+            .setContentTitle("V práci od ${time(reportStartMs)}")
+            .setContentText(text)
+            .setWhen(rawStartMs)
+            .setShowWhen(true)
+            .setUsesChronometer(true)
+            .setOngoing(true)
+            .setSilent(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setContentIntent(open)
+        if (returnAtMs != null) builder.addAction(quickAction("Konec v ${time(returnAtMs)}", endAt(1, returnAtMs)))
+        builder.addAction(quickAction("Ukončit práci teď", endAt(2, null)))
+        notifySafe(ctx, STATUS_ID, builder)
+    }
+
+    fun cancelWorking(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(STATUS_ID)
     private const val DONE_ID = 504
     const val ACTION_END_AT = "cz.kutil.dochazka.END_AT"
     const val EXTRA_END_AT = "end_at"
@@ -76,6 +119,10 @@ object Notifier {
         val done = NotificationChannel(CHANNEL_DONE, "Potvrzení zápisu", NotificationManager.IMPORTANCE_LOW)
         done.description = "Krátká potvrzení po odpovědi ANO / NE přímo v oznámení."
         nm.createNotificationChannel(done)
+        val status = NotificationChannel(CHANNEL_STATUS, "Stav práce", NotificationManager.IMPORTANCE_LOW)
+        status.description = "Trvalé oznámení „V práci od …“, dokud běží směna."
+        status.lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+        nm.createNotificationChannel(status)
     }
 
     /** Připomenutí měsíční uzávěrky. Vrací false, pokud oznámení nejde zobrazit. */

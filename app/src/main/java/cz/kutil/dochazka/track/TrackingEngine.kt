@@ -158,6 +158,7 @@ object TrackingEngine {
             notify.filter { it !in cancel }.forEach { id -> dao.pending(id)?.let { Notifier.show(app, it) } }
             verify.forEach { VerifyExitWorker.schedule(app, it) }
             if (shiftClosed) Notifier.cancelLongShift(app)
+            refreshStatus(app)
             if (reRegister) GeofenceManager.register(app, selfHeal = false)
         }
         note
@@ -190,6 +191,20 @@ object TrackingEngine {
         listOf(Graph.realDb(app), Graph.demoDb(app)).sumOf { db ->
             db.dao().deleteOldSuperseded(now - SUPERSEDED_KEEP_MS) + db.dao().deleteOldResolved(now - RESOLVED_KEEP_MS)
         }
+    }
+
+    /** Zobrazí nebo skryje trvalé oznámení „V práci od …“ podle skutečné otevřené směny v databázi. */
+    suspend fun refreshStatus(ctx: Context) {
+        val app = ctx.applicationContext
+        val dao = Graph.realDb(app).dao()
+        val open = dao.openShift()
+        if (open == null || !AppPrefs.statusNotification(app)) {
+            Notifier.cancelWorking(app)
+            return
+        }
+        val reportStart = open.editedStart ?: cz.kutil.dochazka.core.Rounding.roundToHalfHour(Instant.ofEpochMilli(open.rawStart)).toEpochMilli()
+        val returnAt = dao.lastReturnFor(open.id)?.effectiveAt?.takeIf { it > open.rawStart }
+        Notifier.showWorking(app, open.id, open.rawStart, reportStart, returnAt)
     }
 
     /** Zapíše diagnostickou zprávu (např. chybu geofence) – zobrazuje se na hlavní obrazovce. */

@@ -114,7 +114,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         // Při otevření aplikace uklidit den staré zrušené události z „K potvrzení“.
-        viewModelScope.launch { runCatching { TrackingEngine.cleanupHistory(ctx) } }
+        viewModelScope.launch {
+            runCatching { TrackingEngine.cleanupHistory(ctx) }
+            runCatching { TrackingEngine.refreshStatus(ctx) }
+        }
     }
     private fun db() = Graph.db(ctx, demo)
     private fun dao() = db().dao()
@@ -157,6 +160,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         message.value = r.message
     }
 
+    fun setStatusNotification(on: Boolean) = launchSafe {
+        AppPrefs.setStatusNotification(ctx, on)
+        TrackingEngine.refreshStatus(ctx)
+    }
+
     fun sendTestNotification() {
         message.value = if (cz.kutil.dochazka.track.Notifier.showTest(ctx)) "Zkušební oznámení odesláno – podívej se do oznámení (a na hodinky)."
         else "Oznámení nejde zobrazit – nejsou povolená."
@@ -186,6 +194,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 )
             )
             message.value = "Interval přidán."
+            if (!demo) TrackingEngine.refreshStatus(ctx)
         } else {
             val old = dao().shift(id) ?: return@launchSafe
             val s = if (round) Rounding.roundToHalfHour(start) else start
@@ -199,12 +208,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 )
             )
             message.value = "Čas opraven."
+            if (!demo) TrackingEngine.refreshStatus(ctx)
         }
     }
 
     fun deleteShift(id: Long) = launchSafe {
         dao().deleteShift(id)
         message.value = "Záznam smazán."
+        if (!demo) TrackingEngine.refreshStatus(ctx)
     }
 
     fun setOverride(date: LocalDate, type: OverrideType?, note: String = "") = launchSafe {

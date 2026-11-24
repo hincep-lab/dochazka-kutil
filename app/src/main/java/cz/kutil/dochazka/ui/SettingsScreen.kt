@@ -50,6 +50,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
     val restorePreview by vm.restorePreview.collectAsStateWithLifecycle()
     var longShiftHours by remember { mutableIntStateOf(AppPrefs.longShiftHours(context)) }
     var backupReminder by remember { mutableStateOf(AppPrefs.backupReminder(context)) }
+    var statusNotif by remember { mutableStateOf(AppPrefs.statusNotification(context)) }
     val lastMessage by vm.message.collectAsStateWithLifecycle()
     val lastBackup = remember(lastMessage, restorePreview) { AppPrefs.lastBackupAt(context) }
     val versionName = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "" }
@@ -108,6 +109,17 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
         }
 
         SectionCard("Kontrola pracovní doby") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Ukazovat v liště „V práci od …“", Modifier.weight(1f))
+                Switch(checked = statusNotif, onCheckedChange = {
+                    statusNotif = it
+                    vm.setStatusNotification(it)
+                })
+            }
+            Text(
+                "Dokud běží směna, visí v oznámeních trvalý řádek s časem začátku, běžícími hodinami a tlačítkem „Ukončit práci teď“.",
+                style = MaterialTheme.typography.bodySmall,
+            )
             Text("Upozornit, když směna běží déle než $longShiftHours hodin", fontWeight = FontWeight.Bold)
             Slider(
                 value = longShiftHours.toFloat(),
