@@ -371,11 +371,10 @@ fun HomeScreen(
                 Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = "Stav sledování", tint = Ind.onBgDim)
             }
         }
-        AnimatedDrain(clock, water, animate)
-        // místo dole, aby šel obsah odrolovat nad Kutilovo jeviště
-        if (gagOn) Spacer(Modifier.height(StageHeight - 40.dp))
+        // místo dole, aby šel obsah odrolovat nad vpusť a Kutilovo jeviště
+        Spacer(Modifier.height(if (gagOn) StageHeight - 40.dp else 70.dp))
     }
-    // přesčas: voda z nádoby stéká přes celou obrazovku až do vpusti dole
+    // jediná vpusť dole; v přesčasu do ní stéká voda z nádoby přes celou obrazovku
     OverflowOverlay(clock, overflowing = open != null && worked > 8 * 3_600_000L, animate = animate, panel = panelBounds, modifier = Modifier.fillMaxSize())
     // Kutil sám chodí po spodní části přehledu a střídá scénky (doteky propouští k tlačítkům)
     if (gagOn) {
