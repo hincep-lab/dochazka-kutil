@@ -579,7 +579,11 @@ fun GlassCard(modifier: Modifier = Modifier, padding: Dp = 12.dp, onClick: (() -
 class PanelBounds { var rect by androidx.compose.runtime.mutableStateOf<Rect?>(null) }
 
 @Composable
-fun OverflowOverlay(clock: State<Float>, overflowing: Boolean, animate: Boolean, panel: PanelBounds, modifier: Modifier = Modifier) {
+fun OverflowOverlay(
+    clock: State<Float>, overflowing: Boolean, animate: Boolean, panel: PanelBounds, modifier: Modifier = Modifier,
+    /** true = jen pevná vpusť na dně (kreslí se pod obsahem), false = jen stékající voda (nad obsahem). */
+    drainOnly: Boolean = false,
+) {
     val k by animateFloatAsState(if (overflowing) 1f else 0f, tween(if (animate) 2200 else 0), label = "overflow")
     val grate = ImageBitmap.imageResource(R.drawable.drain_persp)
     var origin by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Offset.Zero) }
@@ -594,7 +598,7 @@ fun OverflowOverlay(clock: State<Float>, overflowing: Boolean, animate: Boolean,
         val startY = r.bottom.coerceIn(0f, size.height * 0.8f)
         val water = Color(0xFF6CC4FF)
         // pramínky: od rohů nádoby dolů a pak do vpusti (jen při přesčasu)
-        if (k > 0.01f) for ((i, x0) in listOf(r.left + 6 * u, r.right - 6 * u).withIndex()) {
+        if (!drainOnly && k > 0.01f) for ((i, x0) in listOf(r.left + 6 * u, r.right - 6 * u).withIndex()) {
             if (i == 2 && k < 0.6f) continue
             val bottom = size.height - 46 * u - i * 6 * u
             val path = Path().apply {
@@ -623,16 +627,18 @@ fun OverflowOverlay(clock: State<Float>, overflowing: Boolean, animate: Boolean,
             val q = ((t * 0.8f + i * 0.37f) % 1f)
             drawDrop(Offset(x0 + (if (i == 1) -1 else 1) * 6 * u * q, startY + (bottom - startY) * q), 2f * u * k, 1.2f)
         }
-        // jediná vpusť: vždy dole uprostřed; kolem ní mokro a vír (při přetékání silnější)
-        val wet = 0.45f + 0.55f * k
-        drawOval(
-            Brush.radialGradient(listOf(Color(0x9954B6FF), Color(0x3340A0FF), Color.Transparent), center = drain, radius = 90 * u * wet),
-            Offset(drain.x - 90 * u * wet, drain.y - 18 * u * wet), Size(180 * u * wet, 36 * u * wet),
-        )
-        for (j in 0 until 4) {
-            val rw = (26f + j * 12f) * u
-            rotate(t * ((160f - j * 25f) * (0.35f + 0.65f * k)) + j * 80f, drain) {
-                drawArc(Color.White.copy(alpha = (0.55f - j * 0.1f) * wet), 0f, 100f, false, Offset(drain.x - rw, drain.y - rw * 0.35f), Size(rw * 2, rw * 0.7f), style = Stroke(1.6f * u))
+        if (!drainOnly) return@Canvas
+        // jediná vpusť: pevně na dně obrazovky, sama se nehýbe; vír a louže jen když do ní teče voda
+        if (k > 0.01f) {
+            drawOval(
+                Brush.radialGradient(listOf(Color(0x9954B6FF), Color(0x3340A0FF), Color.Transparent), center = drain, radius = 90 * u * k),
+                Offset(drain.x - 90 * u * k, drain.y - 18 * u * k), Size(180 * u * k, 36 * u * k),
+            )
+            for (j in 0 until 3) {
+                val rw = (30f + j * 12f) * u
+                rotate(t * (120f - j * 25f) + j * 80f, drain) {
+                    drawArc(Color.White.copy(alpha = (0.45f - j * 0.1f) * k), 0f, 100f, false, Offset(drain.x - rw, drain.y - rw * 0.35f), Size(rw * 2, rw * 0.7f), style = Stroke(1.5f * u))
+                }
             }
         }
         val gw = 70 * u

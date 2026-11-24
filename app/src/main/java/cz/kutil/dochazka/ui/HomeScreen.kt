@@ -145,6 +145,8 @@ fun HomeScreen(
 
     Box(Modifier.fillMaxSize()) {
     SidePipes(clock, water, animate)
+    // pevná vpusť na dně obrazovky (pod obsahem – při posouvání zůstává na místě)
+    OverflowOverlay(clock, overflowing = open != null && worked > 8 * 3_600_000L, animate = animate, panel = panelBounds, modifier = Modifier.fillMaxSize(), drainOnly = true)
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -374,7 +376,7 @@ fun HomeScreen(
         // místo dole, aby šel obsah odrolovat nad vpusť a Kutilovo jeviště
         Spacer(Modifier.height(if (gagOn) StageHeight - 40.dp else 70.dp))
     }
-    // jediná vpusť dole; v přesčasu do ní stéká voda z nádoby přes celou obrazovku
+    // v přesčasu stéká voda z nádoby přes celou obrazovku do vpusti
     OverflowOverlay(clock, overflowing = open != null && worked > 8 * 3_600_000L, animate = animate, panel = panelBounds, modifier = Modifier.fillMaxSize())
     // Kutil sám chodí po spodní části přehledu a střídá scénky (doteky propouští k tlačítkům)
     if (gagOn) {
