@@ -225,6 +225,34 @@ class ScreenshotTests {
 
     @Test
     @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageValve() = stage("20_ventil", cz.kutil.dochazka.ui.Act.VALVE, listOf(4f, 6.5f, 7.6f, 9f, 10.6f, 12f, 13.5f, 14f, 15.5f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageTape() = stage("21_paska", cz.kutil.dochazka.ui.Act.TAPE, listOf(4f, 6.5f, 8f, 9.8f, 10.6f, 11.6f, 13.4f, 14.2f, 15.5f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageBucket() = stage("22_kbelik", cz.kutil.dochazka.ui.Act.BUCKET, listOf(2f, 4f, 5.8f, 7f, 8.2f, 9.2f, 10.5f, 12.8f, 13.6f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageFlood() = stage("23_povoden", cz.kutil.dochazka.ui.Act.FLOOD, listOf(1.5f, 4f, 7f, 10.5f, 11.8f, 13f, 13.8f, 15f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageCoffee() = stage("24_kava", cz.kutil.dochazka.ui.Act.COFFEE, listOf(2f, 5.1f, 6.4f, 8.4f, 9.8f, 10.5f, 13.5f, 15.4f, 16.4f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageSpiral() = stage("25_spirala", cz.kutil.dochazka.ui.Act.SPIRAL, listOf(3.5f, 5f, 6.9f, 8f, 9.5f, 11f, 12f, 13.4f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun stageEndShift() = stage("26_konec_smeny", cz.kutil.dochazka.ui.Act.END_SHIFT, listOf(1f, 2.8f, 3.7f, 5.5f, 6.8f, 7.8f, 8.8f, 10f))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
     fun stageWander() = stage("18_prochazka", cz.kutil.dochazka.ui.Act.WANDER, listOf(2f, 5f, 8f))
 
     /**

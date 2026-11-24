@@ -61,7 +61,10 @@ internal object T {
 }
 
 /** Zvukové okamžiky scénky (čas od začátku → zvuk). */
-enum class GagSound { BURST_START, BURST_STOP, SPLASH, CLANK, BOING, THUD, PLOP, GURGLE, POP, FLUSH, SNORE, SQUEAK, BURP, CHEER }
+enum class GagSound {
+    BURST_START, BURST_STOP, SPLASH, SPLASH_BIG, CLANK, BOING, THUD, PLOP, GURGLE, POP, FLUSH, SNORE, SQUEAK, BURP, CHEER,
+    TAPE, BUCKET, STIR, COFFEE_POUR, DRILL, SIGH, KEYS, CREAK, METAL_FALL, TOOL_DROP,
+}
 
 /** Scénky se střídají. */
 enum class GagScene { PIPE, TOILET }
@@ -512,6 +515,8 @@ internal class Pose(
     val carry: Int = 0,
     val zzz: Boolean = false,
     val noTool: Boolean = false,
+    /** Co má na hlavě: 0 čepici, 1 kbelík (přes celou hlavu). */
+    val headgear: Int = 0,
 )
 
 internal fun poseAt(e: Float, t: Float, crackX: Float, w: Float, u: Float): Pose {
@@ -658,7 +663,7 @@ internal class PoseSmoother {
         return Pose(
             c[0], target.facing, c[8], target.stride, c[1], c[2], c[3], c[4], c[5], c[6], c[7], target.wet, c[10], c[11],
             target.wink, target.thumb, target.tape, target.eyesClosed, target.plunger, target.plungerOnFace, c[9],
-            c[12], target.carry, target.zzz, target.noTool,
+            c[12], target.carry, target.zzz, target.noTool, target.headgear,
         )
     }
 }
@@ -773,6 +778,7 @@ internal fun DrawScope.drawPlumber(p: Pose, floorY: Float, u: Float) {
                     }
                     // ---------- hlava
                     drawPlumberHead(Offset(4 * u, -74 * u), p, u, t)
+                    if (p.headgear == 1) drawBucketOnHead(Offset(4 * u, -74 * u), u, t)
                     // ---------- přední ruka
                     drawArmLimb(Offset(8 * u, -55 * u), p.armR, u, back = false, p = p)
                     if (p.plungerOnFace) {
@@ -861,6 +867,25 @@ internal fun DrawScope.drawArmLimb(sh: Offset, angle: Float, u: Float, back: Boo
                     close()
                 }
                 outlined(cup, Brush.verticalGradient(listOf(Color(0xFFD63A2F), Color(0xFF8E1B1B)), startY = end.y, endY = end.y + 9 * u), u)
+            }
+            if (p.carry == 4) {
+                // hrnek kávy: vždy rovně; při pití se nakloní k puse, nad ním stoupá pára
+                val drink = ((p.armR - 90f) / 75f).coerceIn(0f, 1f)
+                rotate(dir - 70f * drink, pivot = tip) {
+                    val mug = androidx.compose.ui.geometry.Rect(tip.x - 2 * u, tip.y - 10 * u, tip.x + 9 * u, tip.y + 3 * u)
+                    drawArc(Outline, 90f, 180f, false, Offset(mug.left - 5 * u, mug.top + 2 * u), Size(8 * u, 8 * u), style = Stroke(2.6f * u))
+                    drawArc(Color(0xFFF4F4F0), 90f, 180f, false, Offset(mug.left - 5 * u, mug.top + 2 * u), Size(8 * u, 8 * u), style = Stroke(1.4f * u))
+                    drawRoundRect(Outline, Offset(mug.left - 1 * u, mug.top - 1 * u), Size(mug.width + 2 * u, mug.height + 2 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.5f * u))
+                    drawRoundRect(Brush.horizontalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFC9CED6)), startX = mug.left, endX = mug.right), mug.topLeft, mug.size, cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
+                    drawOval(Color(0xFF5A3415), Offset(mug.left + 0.5f * u, mug.top - 1 * u), Size(mug.width - 1 * u, 3 * u))
+                    drawLine(Color(0xFFD63A2F), Offset(mug.left + 1 * u, mug.top + 5 * u), Offset(mug.right - 1 * u, mug.top + 5 * u), strokeWidth = 1.6f * u)
+                    val tt = p.stride / 14f
+                    if (drink < 0.5f) for (i in 0 until 2) {
+                        val q = ((tt * 0.7f + i * 0.5f) % 1f)
+                        drawLine(Color.White.copy(alpha = 0.45f * (1f - q)), Offset(mug.center.x + (i - 0.5f) * 3 * u + 1.5f * u * sin(tt * 4f + i), mug.top - 3 * u - 12 * u * q),
+                            Offset(mug.center.x + (i - 0.5f) * 3 * u - 1.5f * u * sin(tt * 4f + i), mug.top - 6 * u - 12 * u * q), strokeWidth = 1.4f * u, cap = StrokeCap.Round)
+                    }
+                }
             }
             if (p.carry == 3) {
                 // korbel piva: vždy pěnou nahoru (zrušíme natočení ruky); při pití se nakloní k puse
@@ -1052,4 +1077,29 @@ internal fun DrawScope.drawStar(c: Offset, r: Float, color: Color) {
     }
     path.close()
     drawPath(path, color)
+}
+
+
+/** Plechový kbelík narazený přes hlavu (gag „Hasák a kbelík“); trochu z něj kape. */
+internal fun DrawScope.drawBucketOnHead(c: Offset, u: Float, t: Float) {
+    val top = c.y - 22 * u
+    val bottom = c.y + 9 * u
+    val b = Path().apply {
+        moveTo(c.x - 13 * u, top); lineTo(c.x + 13 * u, top)
+        lineTo(c.x + 17 * u, bottom); lineTo(c.x - 17 * u, bottom); close()
+    }
+    outlined(b, Brush.horizontalGradient(listOf(Color(0xFF8C96A2), Color(0xFFE4E9EE), Color(0xFF9AA4B0), Color(0xFF6E7884)), startX = c.x - 17 * u, endX = c.x + 17 * u), u)
+    for (k in listOf(0.3f, 0.7f)) {
+        val y = top + (bottom - top) * k
+        val hw = 13 * u + 4 * u * k
+        drawLine(Color(0x55303A46), Offset(c.x - hw, y), Offset(c.x + hw, y), strokeWidth = 1.4f * u)
+    }
+    drawLine(Outline, Offset(c.x - 18 * u, bottom), Offset(c.x + 18 * u, bottom), strokeWidth = 3.4f * u, cap = StrokeCap.Round)
+    drawLine(Color(0xFFC9D1D9), Offset(c.x - 18 * u, bottom), Offset(c.x + 18 * u, bottom), strokeWidth = 1.8f * u, cap = StrokeCap.Round)
+    // ucho kbelíku visí na stranu
+    drawArc(Outline, 10f, 160f, false, Offset(c.x - 16 * u, bottom - 6 * u), Size(32 * u, 22 * u), style = Stroke(1.6f * u))
+    for (i in 0 until 2) {
+        val q = ((t * 1.3f + i * 0.5f) % 1f)
+        drawDrop(Offset(c.x + (i * 2 - 1) * 15 * u, bottom + 2 * u + 30 * u * q * q), 1.8f * u, 1.2f)
+    }
 }

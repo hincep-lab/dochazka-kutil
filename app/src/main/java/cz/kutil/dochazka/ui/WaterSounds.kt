@@ -19,7 +19,8 @@ import cz.kutil.dochazka.data.AppPrefs
 
 /**
  * Zvuky vody: ťuknutí kapky při dopadu na hladinu a tiché šumění, když nádoba v přesčasu přetéká.
- * Zvuky jsou syntetizované (tools/render_sounds.py), krátké a tiché. Hrají jen když:
+ * Zvuky jsou skutečné nahrávky z BigSoundBank.com (licence CC0 – volné dílo, bez povinnosti uvádět autora),
+ * zkrácené a ztišené skriptem tools/cut_sounds.py. Hrají jen když:
  *  - je zapnuté nastavení „Zvuky vody“ i dekorativní animace,
  *  - telefon není v tichém režimu ani na vibracích,
  *  - aplikace je na obrazovce (při odchodu z aplikace se vše zastaví).
@@ -32,7 +33,7 @@ object SoundTap {
 class WaterSounds(ctx: Context) {
     private val audio = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val pool = SoundPool.Builder()
-        .setMaxStreams(3)
+        .setMaxStreams(4)
         .setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
@@ -41,21 +42,36 @@ class WaterSounds(ctx: Context) {
         )
         .build()
     private val drip = pool.load(ctx, R.raw.water_drip, 1)
+    private val pourId = pool.load(ctx, R.raw.water_pour, 1)
     private val overflow = pool.load(ctx, R.raw.water_overflow, 1)
-    private val clank = pool.load(ctx, R.raw.gag_clank, 1)
-    private val splash = pool.load(ctx, R.raw.gag_splash, 1)
-    private val boing = pool.load(ctx, R.raw.gag_boing, 1)
-    private val thud = pool.load(ctx, R.raw.gag_thud, 1)
-    private val spray = pool.load(ctx, R.raw.gag_spray, 1)
-    private val plop = pool.load(ctx, R.raw.gag_plop, 1)
-    private val gurgle = pool.load(ctx, R.raw.gag_gurgle, 1)
-    private val popS = pool.load(ctx, R.raw.gag_pop, 1)
-    private val flush = pool.load(ctx, R.raw.gag_flush, 1)
-    private val squeak = pool.load(ctx, R.raw.gag_squeak, 1)
-    private val snore = pool.load(ctx, R.raw.gag_snore, 1)
-    private val burp = pool.load(ctx, R.raw.gag_burp, 1)
-    private val cheer = pool.load(ctx, R.raw.gag_cheer, 1)
+    /** Jednorázové zvuky scének: soubor a hlasitost (vše záměrně potichu). */
+    private val oneShots: Map<GagSound, Pair<Int, Float>> = mapOf(
+        GagSound.SPLASH to (pool.load(ctx, R.raw.gag_splash, 1) to 0.22f),
+        GagSound.SPLASH_BIG to (pool.load(ctx, R.raw.gag_splash_big, 1) to 0.22f),
+        GagSound.CLANK to (pool.load(ctx, R.raw.gag_clank, 1) to 0.16f),
+        GagSound.BOING to (pool.load(ctx, R.raw.gag_boing, 1) to 0.18f),
+        GagSound.THUD to (pool.load(ctx, R.raw.gag_thud, 1) to 0.26f),
+        GagSound.PLOP to (pool.load(ctx, R.raw.gag_plop, 1) to 0.24f),
+        GagSound.GURGLE to (pool.load(ctx, R.raw.gag_gurgle, 1) to 0.2f),
+        GagSound.POP to (pool.load(ctx, R.raw.gag_pop, 1) to 0.22f),
+        GagSound.FLUSH to (pool.load(ctx, R.raw.gag_flush, 1) to 0.18f),
+        GagSound.SQUEAK to (pool.load(ctx, R.raw.gag_squeak, 1) to 0.18f),
+        GagSound.SNORE to (pool.load(ctx, R.raw.gag_snore, 1) to 0.22f),
+        GagSound.BURP to (pool.load(ctx, R.raw.gag_burp, 1) to 0.22f),
+        GagSound.CHEER to (pool.load(ctx, R.raw.gag_cheer, 1) to 0.14f),
+        GagSound.TAPE to (pool.load(ctx, R.raw.gag_tape, 1) to 0.24f),
+        GagSound.BUCKET to (pool.load(ctx, R.raw.gag_bucket, 1) to 0.2f),
+        GagSound.STIR to (pool.load(ctx, R.raw.gag_stir, 1) to 0.24f),
+        GagSound.COFFEE_POUR to (pool.load(ctx, R.raw.gag_coffee_pour, 1) to 0.2f),
+        GagSound.DRILL to (pool.load(ctx, R.raw.gag_drill, 1) to 0.12f),
+        GagSound.SIGH to (pool.load(ctx, R.raw.gag_sigh, 1) to 0.24f),
+        GagSound.KEYS to (pool.load(ctx, R.raw.gag_keys, 1) to 0.22f),
+        GagSound.CREAK to (pool.load(ctx, R.raw.gag_creak, 1) to 0.16f),
+        GagSound.METAL_FALL to (pool.load(ctx, R.raw.gag_metal_fall, 1) to 0.16f),
+        GagSound.TOOL_DROP to (pool.load(ctx, R.raw.gag_tool_drop, 1) to 0.2f),
+    )
     private var overflowStream = 0
+    private var pourStream = 0
     private var sprayStream = 0
 
     /** Zvuky scénky s instalatérem. */
@@ -65,20 +81,13 @@ class WaterSounds(ctx: Context) {
             stopSpray(); return
         }
         when (s) {
-            GagSound.BURST_START -> if (sprayStream == 0) sprayStream = pool.play(spray, 0.14f, 0.14f, 0, -1, 1f)
+            // stříkající trubka: šumění tekoucí vody, trochu výš laděné
+            GagSound.BURST_START -> if (sprayStream == 0) sprayStream = pool.play(pourId, 0.13f, 0.13f, 0, -1, 1.25f)
             GagSound.BURST_STOP -> stopSpray()
-            GagSound.SPLASH -> pool.play(splash, 0.23f, 0.23f, 1, 0, 1f)
-            GagSound.CLANK -> pool.play(clank, 0.20f, 0.20f, 1, 0, 0.95f + Math.random().toFloat() * 0.1f)
-            GagSound.BOING -> pool.play(boing, 0.20f, 0.20f, 1, 0, 1f)
-            GagSound.THUD -> pool.play(thud, 0.23f, 0.23f, 1, 0, 1f)
-            GagSound.PLOP -> pool.play(plop, 0.23f, 0.23f, 1, 0, 0.9f + Math.random().toFloat() * 0.2f)
-            GagSound.GURGLE -> pool.play(gurgle, 0.20f, 0.20f, 1, 0, 1f)
-            GagSound.POP -> pool.play(popS, 0.25f, 0.25f, 1, 0, 1f)
-            GagSound.SQUEAK -> pool.play(squeak, 0.22f, 0.22f, 1, 0, 1f)
-            GagSound.SNORE -> pool.play(snore, 0.25f, 0.25f, 1, 0, 1f)
-            GagSound.BURP -> pool.play(burp, 0.2f, 0.2f, 1, 0, 1f)
-            GagSound.CHEER -> pool.play(cheer, 0.18f, 0.18f, 1, 0, 1f)
-            GagSound.FLUSH -> pool.play(flush, 0.20f, 0.20f, 1, 0, 1f)
+            else -> oneShots[s]?.let { (id, vol) ->
+                val rate = if (s == GagSound.CLANK || s == GagSound.PLOP) 0.94f + Math.random().toFloat() * 0.12f else 1f
+                pool.play(id, vol, vol, 1, 0, rate)
+            }
         }
     }
 
@@ -90,13 +99,24 @@ class WaterSounds(ctx: Context) {
 
     fun drip() {
         SoundTap.listener?.invoke("DRIP")
-        if (allowed()) pool.play(drip, 0.22f, 0.22f, 1, 0, 0.96f + Math.random().toFloat() * 0.08f)
+        if (allowed()) pool.play(drip, 0.2f, 0.2f, 1, 0, 0.96f + Math.random().toFloat() * 0.08f)
+    }
+
+    /** Tekoucí voda z kohoutku během směny (smyčka, velmi potichu). */
+    fun pour(on: Boolean) {
+        SoundTap.listener?.invoke(if (on) "POUR_ON" else "POUR_OFF")
+        if (on && allowed()) {
+            if (pourStream == 0) pourStream = pool.play(pourId, 0.07f, 0.07f, 0, -1, 1f)
+        } else if (pourStream != 0) {
+            pool.stop(pourStream)
+            pourStream = 0
+        }
     }
 
     fun overflow(on: Boolean) {
         SoundTap.listener?.invoke(if (on) "OVERFLOW_ON" else "OVERFLOW_OFF")
         if (on && allowed()) {
-            if (overflowStream == 0) overflowStream = pool.play(overflow, 0.14f, 0.14f, 0, -1, 1f)
+            if (overflowStream == 0) overflowStream = pool.play(overflow, 0.12f, 0.12f, 0, -1, 1f)
         } else if (overflowStream != 0) {
             pool.stop(overflowStream)
             overflowStream = 0
@@ -107,6 +127,7 @@ class WaterSounds(ctx: Context) {
     fun resumeAll() = pool.autoResume()
     fun release() {
         overflow(false)
+        pour(false)
         stopSpray()
         pool.release()
     }
@@ -138,9 +159,10 @@ fun rememberWaterSounds(enabled: Boolean): WaterSounds? {
 
 /** Napojení zvuků na animaci: kapka zazní přesně při dopadu, přetékání hraje po dobu přesčasu. */
 @Composable
-fun WaterSoundEffects(sounds: WaterSounds?, clock: State<Float>, drip: DripSync, dripping: Boolean, overflowing: Boolean) {
+fun WaterSoundEffects(sounds: WaterSounds?, clock: State<Float>, drip: DripSync, dripping: Boolean, pouring: Boolean, overflowing: Boolean) {
     if (sounds == null) return
-    DisposableEffect(sounds) { onDispose { sounds.overflow(false) } }
+    DisposableEffect(sounds) { onDispose { sounds.overflow(false); sounds.pour(false) } }
+    LaunchedEffect(pouring) { sounds.pour(pouring) }
     LaunchedEffect(overflowing) { sounds.overflow(overflowing) }
     LaunchedEffect(dripping) {
         if (!dripping) return@LaunchedEffect

@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -35,13 +36,19 @@ import kotlin.math.sin
 
 enum class Act(val length: Float) {
     PIPE(17.5f), TOILET(17.5f), LADDER(18.5f), SINK(17.5f), TUB(19f), WANDER(10f),
+    VALVE(17f), TAPE(17f), BUCKET(16.5f), FLOOD(16.5f), COFFEE(18.5f), SPIRAL(16f),
+    /** Jednou po skončení směny, pak televize. */
+    END_SHIFT(12f),
     /** Mimo pracovní dobu: křeslo, televize a pivo (smyčka). */
     TV(24f),
     /** Od 20:00 do 6:00: spí v křesle (smyčka). */
     SLEEP(16f),
 }
 
-private val SCENES = listOf(Act.PIPE, Act.TOILET, Act.LADDER, Act.SINK, Act.TUB)
+private val SCENES = listOf(
+    Act.PIPE, Act.TOILET, Act.LADDER, Act.SINK, Act.TUB,
+    Act.VALVE, Act.TAPE, Act.BUCKET, Act.FLOOD, Act.COFFEE, Act.SPIRAL,
+)
 
 private fun eventsOf(a: Act): List<Pair<Float, GagSound>> = when (a) {
     Act.PIPE -> listOf(
@@ -56,7 +63,7 @@ private fun eventsOf(a: Act): List<Pair<Float, GagSound>> = when (a) {
     )
     Act.LADDER -> listOf(
         7.4f to GagSound.CLANK, 8.0f to GagSound.CLANK, 8.6f to GagSound.CLANK,
-        10.5f to GagSound.CLANK, 11.0f to GagSound.THUD, 12.8f to GagSound.BOING, 13.15f to GagSound.THUD,
+        10.5f to GagSound.CREAK, 11.0f to GagSound.METAL_FALL, 12.8f to GagSound.BOING, 13.15f to GagSound.THUD,
     )
     Act.SINK -> listOf(
         5.6f to GagSound.CLANK, 6.4f to GagSound.CLANK, 7.3f to GagSound.CLANK, 8.6f to GagSound.CLANK,
@@ -65,6 +72,36 @@ private fun eventsOf(a: Act): List<Pair<Float, GagSound>> = when (a) {
     Act.TUB -> listOf(
         8.6f to GagSound.SNORE, 10.6f to GagSound.SNORE, 12.2f to GagSound.SQUEAK, 12.25f to GagSound.BOING,
         14.4f to GagSound.SQUEAK,
+    )
+    Act.VALVE -> listOf(
+        3.3f to GagSound.CREAK, 4.8f to GagSound.CREAK, 6.0f to GagSound.POP, 6.02f to GagSound.BURST_START, 6.8f to GagSound.TOOL_DROP,
+        8.3f to GagSound.PLOP, 8.62f to GagSound.BURST_STOP, 9.8f to GagSound.BURST_START, 11.4f to GagSound.BURST_STOP,
+        11.8f to GagSound.CLANK, 12.3f to GagSound.CLANK, 12.8f to GagSound.CLANK, 13.4f to GagSound.SPLASH,
+    )
+    Act.TAPE -> listOf(
+        3.2f to GagSound.TAPE, 4.5f to GagSound.TAPE, 5.8f to GagSound.TAPE, 6.9f to GagSound.TAPE, 9.0f to GagSound.CREAK,
+        10.4f to GagSound.POP, 10.42f to GagSound.SPLASH_BIG, 10.45f to GagSound.BURST_START, 10.9f to GagSound.THUD,
+        12.1f to GagSound.BURST_STOP, 14.6f to GagSound.TOOL_DROP,
+    )
+    Act.BUCKET -> listOf(
+        3.5f to GagSound.CLANK, 4.2f to GagSound.CLANK, 4.9f to GagSound.CLANK, 5.2f to GagSound.BURST_START,
+        9.0f to GagSound.BUCKET, 9.05f to GagSound.SPLASH_BIG, 9.25f to GagSound.BURST_STOP, 11.0f to GagSound.THUD, 13.7f to GagSound.BUCKET,
+    )
+    Act.FLOOD -> listOf(
+        0.2f to GagSound.BURST_START, 0.5f to GagSound.SPLASH, 2.6f to GagSound.SQUEAK, 6.1f to GagSound.SQUEAK, 9.9f to GagSound.BURST_STOP,
+        10.3f to GagSound.GURGLE, 12.1f to GagSound.GURGLE, 13.3f to GagSound.THUD, 13.6f to GagSound.SQUEAK,
+    )
+    Act.COFFEE -> listOf(
+        3.9f to GagSound.STIR, 6.1f to GagSound.SIGH, 8.6f to GagSound.PLOP, 9.4f to GagSound.POP, 9.42f to GagSound.BURST_START,
+        9.6f to GagSound.BOING, 11.5f to GagSound.BURST_STOP, 12.2f to GagSound.PLOP, 15.3f to GagSound.SPLASH, 15.9f to GagSound.BURP,
+    )
+    Act.SPIRAL -> listOf(
+        3.6f to GagSound.DRILL, 6.2f to GagSound.DRILL, 6.4f to GagSound.BOING, 8.8f to GagSound.DRILL, 10.6f to GagSound.CLANK,
+        11.6f to GagSound.METAL_FALL, 12.0f to GagSound.SIGH,
+    )
+    Act.END_SHIFT -> listOf(
+        0.4f to GagSound.CLANK, 1.0f to GagSound.CLANK, 1.6f to GagSound.CLANK, 2.6f to GagSound.SIGH, 4.3f to GagSound.KEYS,
+        6.0f to GagSound.BURST_START, 11.9f to GagSound.BURST_STOP,
     )
     Act.WANDER -> emptyList()
     Act.TV -> listOf(9.2f to GagSound.BURP, 18.0f to GagSound.CHEER)
@@ -99,15 +136,26 @@ fun PlumberStage(
     val start = remember { mutableFloatStateOf(-1000f) }
     val variant = remember { mutableIntStateOf(0) }
     val smoother = remember { PoseSmoother() }
+    // byl Kutil v této obrazovce v práci? Po skončení směny se nejdřív sbalí (scénka END_SHIFT)
+    val wasWorking = remember { booleanArrayOf(working) }
     // režisér: scénky se střídají samy, mezi nimi se Kutil občas jen projde
     LaunchedEffect(animate, fixedAct, working, night) {
         if (!animate || fixedAct != null) return@LaunchedEffect
         if (!working && PlumberDebug.forcedOrder == null) {
+            if (wasWorking[0]) {
+                // právě skončila směna: „padla!“, pak teprve televize
+                wasWorking[0] = false
+                act.intValue = Act.END_SHIFT.ordinal
+                start.floatValue = clock.value
+                val until = clock.value + Act.END_SHIFT.length + 1f
+                snapshotFlow { clock.value }.first { it >= until }
+            }
             // po práci: televize a pivo, v noci spánek – běží ve smyčce
             act.intValue = (if (night) Act.SLEEP else Act.TV).ordinal
             start.floatValue = clock.value
             return@LaunchedEffect
         }
+        wasWorking[0] = true
         val forced = PlumberDebug.forcedOrder?.toMutableList()
         val order = forced ?: SCENES.shuffled().toMutableList()
         var nextAt = clock.value + 2.5f
@@ -132,6 +180,7 @@ fun PlumberStage(
     LaunchedEffect(animate, act.intValue, start.floatValue) {
         if (!animate || fixedAct != null) return@LaunchedEffect
         val events = eventsOf(Act.entries[act.intValue])
+        onSound(GagSound.BURST_STOP) // stříkání z předchozí scénky nikdy nepřetrvá
         var prev = -1f
         val a = Act.entries[act.intValue]
         val loop = a == Act.TV || a == Act.SLEEP
@@ -164,6 +213,13 @@ fun PlumberStage(
             Act.TUB -> actTub(e, t, floorY, u, fade, smoother)
             Act.TV -> actLounge(e, t, floorY, u, sleep = false, sm = smoother)
             Act.SLEEP -> actLounge(e, t, floorY, u, sleep = true, sm = smoother)
+            Act.VALVE -> actValve(e, t, floorY, u, fade, pipes, smoother)
+            Act.TAPE -> actTape(e, t, floorY, u, fade, pipes, smoother)
+            Act.BUCKET -> actBucket(e, t, floorY, u, fade, pipes, smoother)
+            Act.FLOOD -> actFlood(e, t, floorY, u, fade, pipes, smoother)
+            Act.COFFEE -> actCoffee(e, t, floorY, u, fade, pipes, smoother)
+            Act.SPIRAL -> actSpiral(e, t, floorY, u, fade, smoother)
+            Act.END_SHIFT -> actEndShift(e, t, floorY, u, fade, pipes, smoother)
             Act.WANDER -> drawPlumber(smoother.smooth(poseWander(e, t, size.width, u, variant.intValue), t, e), floorY, u)
         }
     }
@@ -173,7 +229,7 @@ fun PlumberStage(
 // pomocné
 // ---------------------------------------------------------------------------------------------
 
-private fun DrawScope.withAlpha(a: Float, block: DrawScope.() -> Unit) {
+internal fun DrawScope.withAlpha(a: Float, block: DrawScope.() -> Unit) {
     if (a >= 0.99f) { block(); return }
     if (a <= 0.01f) return
     drawIntoCanvas { it.saveLayer(Rect(Offset.Zero, size), Paint().apply { alpha = a }) }
@@ -181,22 +237,23 @@ private fun DrawScope.withAlpha(a: Float, block: DrawScope.() -> Unit) {
     drawIntoCanvas { it.restore() }
 }
 
-private fun sg(e: Float, a: Float, b: Float) = ((e - a) / (b - a)).coerceIn(0f, 1f)
-private fun ez(k: Float) = k * k * (3 - 2 * k)
-private fun lp(a: Float, b: Float, k: Float) = a + (b - a) * k.coerceIn(0f, 1f)
+internal fun sg(e: Float, a: Float, b: Float) = ((e - a) / (b - a)).coerceIn(0f, 1f)
+internal fun ez(k: Float) = k * k * (3 - 2 * k)
+internal fun lp(a: Float, b: Float, k: Float) = a + (b - a) * k.coerceIn(0f, 1f)
 
-private fun P(
+internal fun P(
     x: Float, t: Float, facing: Float = 1f, run: Float = 0f, armR: Float = 10f, armL: Float = -10f, lean: Float = 0f,
     tilt: Float = 0f, sit: Float = 0f, capLift: Float = 0f, capSpin: Float = 0f, wet: Boolean = false, dazed: Float = 0f,
     grin: Float = 0f, wink: Boolean = false, thumb: Boolean = false, tape: Boolean = false, closed: Boolean = false,
-    lift: Float = 0f, carry: Int = 0, zzz: Boolean = false, wrench: Boolean = true,
+    lift: Float = 0f, carry: Int = 0, zzz: Boolean = false, wrench: Boolean = true, bucket: Boolean = false,
 ) = Pose(
     x, facing, run, t * 14f, armR, armL, lean, tilt, sit, capLift, capSpin, wet, dazed, grin, wink, thumb,
-    tape = tape, eyesClosed = closed, lift = lift, carry = carry, zzz = zzz, noTool = !wrench || carry > 0,
+    tape = tape, eyesClosed = closed, lift = lift, carry = carry, zzz = zzz, noTool = !wrench || carry > 0 || tape,
+    headgear = if (bucket) 1 else 0,
 )
 
 /** Chůze z bodu do bodu s houpáním rukou. */
-private fun walkArms(t: Float, fast: Boolean = false): Pair<Float, Float> {
+internal fun walkArms(t: Float, fast: Boolean = false): Pair<Float, Float> {
     val k = if (fast) 18f else 11f
     return (28f * sin(t * k)) to (-28f * sin(t * k))
 }

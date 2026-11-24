@@ -174,11 +174,12 @@ fun HomeScreen(
         }
 
         // --- hlavní panel s vodou ------------------------------------------------------------
+        // v práci teče z kohoutku proud (a v přesčasu přetéká), doma jen kape
+        WaterSoundEffects(sounds, clock, dripSync, dripping = water.flow < 0.12f, pouring = water.flow > 0.5f, overflowing = open != null && worked > 8 * 3_600_000L)
         when {
             open != null && reportStart != null -> {
                 val startDay = Fmt.zoned(open.rawStart).toLocalDate()
                 val over = worked > 8 * 3_600_000L
-                WaterSoundEffects(sounds, clock, dripSync, dripping = water.flow > 0.85f, overflowing = over)
                 WaterPanel(
                     GlassTone.WORKING, clock, water, worked / (8f * 3_600_000f), animate, drip = dripSync,
                     modifier = Modifier.onGloballyPositioned { panelBounds.rect = it.boundsInRoot() },
@@ -207,7 +208,7 @@ fun HomeScreen(
             }
             pending.isNotEmpty() -> {
                 val p = pending.first()
-                WaterPanel(GlassTone.PENDING, clock, water, 0f, animate) {
+                WaterPanel(GlassTone.PENDING, clock, water, 0f, animate, drip = dripSync) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(R.drawable.ic_notifications_active), null, tint = Color.White, modifier = Modifier.size(30.dp))
                         Spacer(Modifier.size(10.dp))
@@ -227,7 +228,7 @@ fun HomeScreen(
             }
             else -> {
                 val away = state.settings.trackState == "AWAY" || state.settings.trackState == "OUTSIDE_PENDING"
-                WaterPanel(GlassTone.IDLE, clock, water, 0f, animate) {
+                WaterPanel(GlassTone.IDLE, clock, water, 0f, animate, drip = dripSync) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(if (away) R.drawable.ic_location_on else R.drawable.ic_home), null, tint = Color.White, modifier = Modifier.size(30.dp))
                         Spacer(Modifier.size(10.dp))

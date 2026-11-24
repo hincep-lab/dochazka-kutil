@@ -300,9 +300,13 @@ private fun DrawScope.drawWater(
         val r = (1.6f + i % 2) * density
         drawCircle(Color.White.copy(alpha = 0.55f), r, Offset(bx, by), style = Stroke(1f * density))
     }
-    // kapka z kohoutku a kruhy na hladině – jen když teče voda
-    if (w.flow < 0.85f) return
     val nx = wv - FaucetNozzleFromEnd.toPx()
+    // v práci teče z kohoutku souvislý proud (plní nádobu); doma jen kape
+    if (w.flow > 0.12f) {
+        drawPourStream(nx, surface + amp * 0.3f, w.flow, phase, h)
+        return
+    }
+    // kapka z kohoutku a kruhy na hladině
     val p = (phase % DRIP_PERIOD) / DRIP_PERIOD * DRIP_PERIOD
     val form = 1.7f
     val stretch = 0.35f
@@ -344,6 +348,50 @@ private fun DrawScope.drawWater(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Souvislý proud z kohoutku: průhledný pramen s pohyblivými odlesky, pěna a kruhy u hladiny. */
+private fun DrawScope.drawPourStream(nx: Float, hit: Float, flow: Float, t: Float, h: Float) {
+    val d = density
+    val k = ((flow - 0.12f) / 0.88f).coerceIn(0f, 1f)
+    val wTop = (3.2f + 3.4f * k) * d
+    val wBot = (2.4f + 2.6f * k) * d
+    val wob = 0.6f * d * sin(t * 17f)
+    val body = Path().apply {
+        moveTo(nx - wTop / 2, 0f)
+        lineTo(nx + wTop / 2, 0f)
+        cubicTo(nx + wTop / 2, hit * 0.4f, nx + wBot / 2 + wob, hit * 0.7f, nx + wBot / 2 + wob, hit)
+        lineTo(nx - wBot / 2 + wob, hit)
+        cubicTo(nx - wBot / 2 + wob, hit * 0.7f, nx - wTop / 2, hit * 0.4f, nx - wTop / 2, 0f)
+        close()
+    }
+    drawPath(body, Brush.horizontalGradient(listOf(Color(0x8854B6FF), Color(0xDDE6F6FF), Color(0x8854B6FF)), startX = nx - wTop / 2, endX = nx + wTop / 2), alpha = 0.35f + 0.6f * k)
+    // tenký lesk uprostřed a putující odlesky dolů
+    drawLine(Color.White.copy(alpha = 0.55f * k), Offset(nx - 0.6f * d, 0f), Offset(nx - 0.6f * d + wob, hit), strokeWidth = 0.9f * d)
+    for (i in 0 until 6) {
+        val q = ((t * 1.9f + i / 6f) % 1f)
+        val y = hit * q
+        drawLine(Color.White.copy(alpha = 0.7f * k * (1f - q * 0.5f)), Offset(nx + wob * q, y), Offset(nx + wob * q, y + 7f * d), strokeWidth = 1.3f * d, cap = StrokeCap.Round)
+    }
+    // pěna a víření v místě dopadu
+    if (hit < h - 2 * d) {
+        drawOval(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.75f * k), Color.Transparent), center = Offset(nx, hit), radius = 16 * d), Offset(nx - 16 * d, hit - 4 * d), Size(32 * d, 8 * d))
+        for (ring in 0 until 3) {
+            val q = ((t * 1.3f + ring / 3f) % 1f)
+            val rw = (8f + 30f * q) * d
+            drawOval(Color.White.copy(alpha = (1f - q) * 0.5f * k), Offset(nx - rw, hit - rw * 0.2f), Size(rw * 2, rw * 0.4f), style = Stroke(1.2f * d))
+        }
+        for (i in 0 until 5) {
+            val q = ((t * 2.3f + i * 0.37f) % 1f)
+            val dx = (if (i % 2 == 0) 1 else -1) * (4f + 9f * q + i) * d
+            drawCircle(Color(0xCCBFE6FF).copy(alpha = (1f - q) * 0.8f * k), 1.3f * d, Offset(nx + dx, hit - 10f * d * q * (1f - q) * 3f))
+        }
+        // bublinky strhávané proudem pod hladinu
+        for (i in 0 until 4) {
+            val q = ((t * 0.9f + i * 0.29f) % 1f)
+            drawCircle(Color.White.copy(alpha = 0.45f * (1f - q) * k), (1.2f + i % 2) * d, Offset(nx + (i - 1.5f) * 5f * d, hit + 4 * d + 26 * d * q), style = Stroke(0.9f * d))
         }
     }
 }
