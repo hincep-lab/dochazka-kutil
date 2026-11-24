@@ -65,7 +65,7 @@ class ScreenshotTests {
 
     private fun ms(d: LocalDate, h: Int, m: Int) = d.atTime(LocalTime.of(h, m)).atZone(PRAGUE).toInstant().toEpochMilli()
 
-    private fun craftedState(open: Boolean, pending: Boolean): UiState {
+    private fun craftedState(open: Boolean, pending: Boolean, hoursAgo: Double? = null): UiState {
         val today = LocalDate.now(PRAGUE)
         val now = System.currentTimeMillis()
         val y = today.minusDays(1)
@@ -73,7 +73,7 @@ class ScreenshotTests {
             ShiftEntity(id = 1, rawStart = ms(y, 7, 4), rawEnd = ms(y, 15, 41), status = ShiftStatus.CLOSED),
         )
         if (open) {
-            val start = ms(today, 7, 2).takeIf { it < now - 30 * 60_000 } ?: (now - 56 * 60_000)
+            val start = hoursAgo?.let { now - (it * 3_600_000).toLong() } ?: (ms(today, 7, 2).takeIf { it < now - 30 * 60_000 } ?: (now - 56 * 60_000))
             shifts += ShiftEntity(id = 2, rawStart = start, rawEnd = null, status = ShiftStatus.OPEN)
         }
         val pend = if (pending) {
@@ -104,6 +104,14 @@ class ScreenshotTests {
     @Test
     @Config(qualifiers = "w412dp-h1700dp-xxhdpi")
     fun homeWorking() = home("01_prehled_v_praci", craftedState(open = true, pending = false))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1500dp-xxhdpi")
+    fun homeOvertime() = home("11_prehled_prescas", craftedState(open = true, pending = false, hoursAgo = 9.4))
+
+    @Test
+    @Config(qualifiers = "w412dp-h1500dp-xxhdpi")
+    fun homeShortShift() = home("12_prehled_kratka_smena", craftedState(open = true, pending = false, hoursAgo = 2.2))
 
     @Test
     @Config(qualifiers = "w412dp-h1700dp-xxhdpi", fontScale = 1.3f)

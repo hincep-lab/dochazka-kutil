@@ -187,7 +187,7 @@ fun HomeScreen(
                         Box(Modifier.padding(horizontal = 8.dp).size(1.dp, 54.dp).background(Color.White.copy(alpha = 0.45f)))
                         PanelValue(
                             "Odpracováno", formatHoursMinutes(worked), Modifier.weight(1.3f), big,
-                            note = if (over) "přesčas nad 8 h" else "z 8 h: ${(worked * 100 / (8 * 3_600_000L)).coerceAtMost(100)} %",
+                            note = if (over) "přesčas – nádoba přetéká" else "nádoba plná z ${(worked * 100 / (8 * 3_600_000L)).coerceAtMost(100)} %",
                             valueColor = Color(0xFF8CF27A),
                         )
                     }

@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -156,7 +157,15 @@ fun WaterPanel(
         GlassTone.IDLE -> Color(0xFF1A3558)
     }
     val lvl by animateFloatAsState(level.coerceIn(0f, 1.5f), tween(if (animate) 1500 else 0), label = "level")
-    Box(modifier.fillMaxWidth()) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            // přetékání nad 8 hodin: kreslí se přes okraj panelu i pod něj
+            .drawWithContent {
+                drawContent()
+                if (lvl > 1f && tone == GlassTone.WORKING) drawOverflow(clock.value, animate, ((lvl - 1f) * 4f).coerceIn(0.35f, 1f))
+            },
+    ) {
         Box(
             Modifier
                 .fillMaxWidth()
@@ -169,7 +178,7 @@ fun WaterPanel(
             // skleněný lesk nahoře
             Box(Modifier.fillMaxWidth().height(36.dp).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.16f), Color.Transparent))))
             CompositionLocalProvider(LocalContentColor provides Color.White) {
-                Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = WaterZone), content = content)
+                Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 22.dp), content = content)
             }
         }
         Faucet(water, Modifier.align(Alignment.TopEnd).offset(x = 12.dp + 2.dp, y = (-48).dp))
@@ -179,15 +188,16 @@ fun WaterPanel(
 private fun DrawScope.drawWater(t: Float, w: WaterState, level: Float, animate: Boolean, tone: GlassTone) {
     val wv = size.width
     val h = size.height
-    // Hladina se drží v pásu pod textem (obsah panelu má dole volné místo WaterZone):
-    // prázdná 10 dp, plná osmihodinová směna 40 dp. Přesčas = jasnější podsvícení.
-    val fillPx = (10f + 30f * min(level, 1f)) * density
+    // Panel je nádoba: čím blíž k 8 hodinám, tím je plnější. V 8 h je plná po okraj,
+    // pak přetéká (viz drawOverflow). Voda je průsvitná a text má stín, takže zůstává čitelný.
+    val rim = 5f * density
+    val fillPx = (8f * density) + (h - rim - 8f * density) * min(level, 1f)
     val surface = h - fillPx
     val overtime = (level - 1f).coerceIn(0f, 0.5f) * 2f
     val amp = (1.5f + 2.5f * w.flow) * density
     val phase = if (animate) t else 0f
     val base = if (tone == GlassTone.PENDING) Color(0xFFFFB648) else Color(0xFF39A7FF)
-    val glow = 0.30f + 0.25f * overtime
+    val glow = 0.22f + 0.18f * overtime
 
     fun waveY(x: Float, k: Float = 1f): Float =
         surface + amp * k * sin(x / wv * 2f * PI.toFloat() * 1.6f + phase * 1.9f) +
@@ -207,7 +217,7 @@ private fun DrawScope.drawWater(t: Float, w: WaterState, level: Float, animate: 
         while (x <= wv) { lineTo(x, waveY(x)); x += 6f * density }
         lineTo(wv, h); close()
     }
-    drawPath(front, Brush.verticalGradient(listOf(base.copy(alpha = glow + 0.12f), Color(0xAA0C3B78)), startY = surface - amp, endY = h))
+    drawPath(front, Brush.verticalGradient(listOf(base.copy(alpha = glow + 0.10f), Color(0x880C3B78)), startY = surface - amp, endY = h))
     // lesk na hřebeni
     val crest = Path().apply {
         var x = 0f
@@ -276,6 +286,40 @@ private fun DrawScope.drawWater(t: Float, w: WaterState, level: Float, animate: 
             }
         }
     }
+}
+
+/**
+ * Přesčas: voda přetéká přes horní okraj, stéká po bocích nádoby a odkapává spodem.
+ * [k] 0..1 = intenzita (roste s délkou přesčasu).
+ */
+private fun DrawScope.drawOverflow(t: Float, animate: Boolean, k: Float) {
+    val w = size.width
+    val h = size.height
+    val ph = if (animate) t else 0f
+    val water = Color(0xFF7CCBFF)
+    // pramínky po obou bocích (přes okraj dolů)
+    for ((x, dir) in listOf(3f * density to 1f, w - 3f * density to -1f)) {
+        val sw = (2.5f + 2.5f * k) * density
+        drawLine(Brush.verticalGradient(listOf(water.copy(alpha = 0.85f), water.copy(alpha = 0.35f)), startY = 0f, endY = h), Offset(x, 0f), Offset(x, h + 6f * density), strokeWidth = sw)
+        // stékající „vlnky“ v pramínku
+        val seg = 18f * density
+        var y = (ph * 60f * density) % seg - seg
+        while (y < h) {
+            drawLine(Color.White.copy(alpha = 0.55f), Offset(x + dir * 0.5f, y), Offset(x + dir * 0.5f, y + seg * 0.3f), strokeWidth = 1.2f * density)
+            y += seg
+        }
+        // přetékající jazyk přes horní hranu
+        drawArc(water.copy(alpha = 0.8f), if (dir > 0) 180f else 270f, 90f, false, Offset(x - dir * 0f - 6f * density, -4f * density), Size(12f * density, 12f * density), style = Stroke(sw))
+    }
+    // odtékání spodem: kapky padají pod panel
+    val outs = listOf(0.12f, 0.5f, 0.88f)
+    for ((i, fx) in outs.withIndex()) {
+        val period = 0.9f + i * 0.17f
+        val q = ((ph + i * 0.31f) % period) / period
+        val y = h + 2f * density + q * q * 26f * density
+        drawDrop(Offset(w * fx, y), (2.6f + 1.2f * k) * density, 1.2f)
+    }
+    drawLine(water.copy(alpha = 0.7f), Offset(w * 0.1f, h), Offset(w * 0.9f, h), strokeWidth = 2f * density)
 }
 
 /** Průhledná kapka s odleskem; [stretch] > 1 = protažená. */
