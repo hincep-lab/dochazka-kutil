@@ -58,6 +58,9 @@ class ScreenshotTests {
         view.draw(Canvas(bmp))
         val dir = File("build/screenshots").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        // zmenšený JPEG pro výpis do záznamu sestavení
+        val small = Bitmap.createScaledBitmap(bmp, bmp.width * 6 / 10, bmp.height * 6 / 10, true)
+        File(dir, "$name.jpg").outputStream().use { small.compress(Bitmap.CompressFormat.JPEG, 82, it) }
     }
 
     private fun ms(d: LocalDate, h: Int, m: Int) = d.atTime(LocalTime.of(h, m)).atZone(PRAGUE).toInstant().toEpochMilli()
