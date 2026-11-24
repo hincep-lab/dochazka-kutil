@@ -49,6 +49,7 @@ object TrackingEngine {
         var reRegister = false
         var shiftClosed = false
         var note = ""
+        var acceptedAt: Long? = null
         val m = meta ?: EventMeta()
 
         db.withTransaction {
@@ -64,6 +65,7 @@ object TrackingEngine {
                 last = last,
             )
             val r = StateMachine.reduce(snapshot, event)
+            if (r.newLast != null && r.newLast != last) acceptedAt = r.newLast.at.toEpochMilli()
             val now = System.currentTimeMillis()
             for (a in r.actions) {
                 when (a) {
@@ -153,6 +155,11 @@ object TrackingEngine {
                 is TrackEvent.GeoExit -> AppPrefs.noteTransition(app, true, event.at.toEpochMilli())
                 is TrackEvent.GeoEnter -> AppPrefs.noteTransition(app, false, event.at.toEpochMilli())
                 else -> Unit
+            }
+            // Pro přehled jen přechody, které automat skutečně přijal jako nový odchod / návrat.
+            if (acceptedAt != null && (event is TrackEvent.GeoExit || event is TrackEvent.GeoEnter)) {
+                val evAt = if (event is TrackEvent.GeoExit) event.at else (event as TrackEvent.GeoEnter).at
+                if (acceptedAt == evAt.toEpochMilli()) AppPrefs.noteRealTransition(app, event is TrackEvent.GeoExit, evAt.toEpochMilli())
             }
             cancel.forEach { Notifier.cancel(app, it) }
             notify.filter { it !in cancel }.forEach { id -> dao.pending(id)?.let { Notifier.show(app, it) } }

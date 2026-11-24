@@ -24,6 +24,18 @@ object Fmt {
         "ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince",
     )
 
+    /** „dnes 08:36“, „včera 22:10“, jinak „Po 23. 11. 08:36“ – vždy v pražském čase. */
+    fun relative(ms: Long): String {
+        val z = zoned(ms)
+        val d = z.toLocalDate()
+        val t = today()
+        return when (d) {
+            t -> "dnes ${time(ms)}"
+            t.minusDays(1) -> "včera ${time(ms)}"
+            else -> dateTime(ms)
+        }
+    }
+
     /** "listopadu" – pro „úterý 24. listopadu“. */
     fun monthGenitive(d: LocalDate): String = GENITIVE[d.monthValue - 1]
 

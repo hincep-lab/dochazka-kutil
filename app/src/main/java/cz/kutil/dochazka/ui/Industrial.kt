@@ -327,7 +327,7 @@ fun SectionTitle(text: String, icon: ImageVector? = null, @DrawableRes iconRes: 
             icon != null -> Icon(icon, null, tint = Ind.orangeDeep, modifier = Modifier.size(22.dp))
         }
         if (icon != null || iconRes != null) Spacer(Modifier.width(8.dp))
-        Text(text, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Ind.text, modifier = Modifier.weight(1f), maxLines = 2)
+        Text(text, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = LocalContentColor.current, modifier = Modifier.weight(1f), maxLines = 2)
         trailing?.invoke()
     }
 }
@@ -384,7 +384,7 @@ fun StatusPanel(tone: PanelTone, modifier: Modifier = Modifier, content: @Compos
 // Lesklá tlačítka
 // =============================================================================================
 
-enum class ActionKind { GO, STOP, ACCENT, METAL }
+enum class ActionKind { GO, STOP, ACCENT, METAL, GLASS }
 
 private class BtnStyle(val top: Color, val mid: Color, val bottom: Color, val edge: Color, val text: Color)
 
@@ -392,6 +392,7 @@ private fun btn(kind: ActionKind) = when (kind) {
     ActionKind.GO -> BtnStyle(Color(0xFF5CC85A), Color(0xFF2E9A35), Color(0xFF1C7426), Color(0xFF125018), Color.White)
     ActionKind.STOP -> BtnStyle(Color(0xFFF2564B), Color(0xFFD72A20), Color(0xFFA8180F), Color(0xFF6E0D07), Color.White)
     ActionKind.ACCENT -> BtnStyle(Color(0xFFFFB648), Color(0xFFF08C12), Color(0xFFC46A04), Color(0xFF7A4100), Color(0xFF1F1200))
+    ActionKind.GLASS -> BtnStyle(Color(0xFF4C94E8), Color(0xFF1F62B8), Color(0xFF15488C), Color(0xFF0B2D5C), Color.White)
     ActionKind.METAL -> BtnStyle(Color(0xFFF2F7FF), Color(0xFFD5E4F9), Color(0xFFB4CDEE), Color(0xFF7B9CC8), Color(0xFF0E2547))
 }
 

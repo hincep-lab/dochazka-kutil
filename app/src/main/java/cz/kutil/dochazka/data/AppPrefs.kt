@@ -24,6 +24,10 @@ object AppPrefs {
     fun setLongShiftHours(ctx: Context, hours: Int) = prefs(ctx).edit().putInt("long_shift_hours", hours.coerceIn(4, 24)).apply()
 
     /** Trvalé oznámení „V práci od …“, dokud běží směna. */
+    /** Dekorativní animace (kapající kohoutek, vlnící se voda, proudění v potrubí). */
+    fun decorAnimations(ctx: Context): Boolean = prefs(ctx).getBoolean("decor_animations", true)
+    fun setDecorAnimations(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("decor_animations", on).apply()
+
     fun statusNotification(ctx: Context): Boolean = prefs(ctx).getBoolean("status_notification", true)
     fun setStatusNotification(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("status_notification", on).apply()
 
@@ -80,6 +84,12 @@ object AppPrefs {
     fun lastEnterAt(ctx: Context): Long = prefs(ctx).getLong("diag_last_enter", 0)
     fun noteTransition(ctx: Context, exit: Boolean, at: Long) =
         prefs(ctx).edit().putLong(if (exit) "diag_last_exit" else "diag_last_enter", at).apply()
+
+    // Skutečné přechody, které automat přijal (bez duplicit a bez potvrzení zóny při její nové registraci).
+    fun lastRealExitAt(ctx: Context): Long = prefs(ctx).getLong("real_last_exit", 0)
+    fun lastRealEnterAt(ctx: Context): Long = prefs(ctx).getLong("real_last_enter", 0)
+    fun noteRealTransition(ctx: Context, exit: Boolean, at: Long) =
+        prefs(ctx).edit().putLong(if (exit) "real_last_exit" else "real_last_enter", at).apply()
 
     fun lastZoneOkAt(ctx: Context): Long = prefs(ctx).getLong("diag_zone_ok_at", 0)
     fun lastZoneError(ctx: Context): Pair<Long, String> =

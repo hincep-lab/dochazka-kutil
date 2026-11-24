@@ -114,6 +114,23 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
             }
         }
 
+        SectionCard("Vzhled") {
+            var decor by remember { mutableStateOf(AppPrefs.decorAnimations(context)) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Dekorativní animace vody", Modifier.weight(1f))
+                Switch(checked = decor, onCheckedChange = {
+                    decor = it
+                    AppPrefs.setDecorAnimations(context, it)
+                })
+            }
+            Text(
+                "Kapající kohoutek, vlnění hladiny, proudění v potrubí a vír u vpusti. Běží jen když je aplikace na obrazovce, " +
+                    "nejvýš 30 snímků za sekundu. Při vypnutí (nebo když má telefon zapnuté „Odebrat animace“) zůstane klidný statický vzhled. " +
+                    "Na docházku nemají animace žádný vliv.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
         SectionCard("Kontrola pracovní doby") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Ukazovat v liště „V práci od …“", Modifier.weight(1f))
