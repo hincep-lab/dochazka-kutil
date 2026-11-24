@@ -598,19 +598,36 @@ private fun DrawScope.actLounge(e: Float, t: Float, floorY: Float, u: Float, sle
     drawRoundRect(Color(0xFF15191F), Offset(tvX - tvW / 2, tvTop), Size(tvW, tvH), cornerRadius = androidx.compose.ui.geometry.CornerRadius(5 * u))
     val scr = Rect(tvX - tvW / 2 + 5 * u, tvTop + 5 * u, tvX + tvW / 2 - 5 * u, tvTop + tvH - 5 * u)
     if (!sleep) {
-        // fotbal: trávník, čáry, míč a hráči; obrazovka trochu bliká
-        val flick = 0.9f + 0.1f * sin(t * 23f)
-        drawRect(Brush.verticalGradient(listOf(Color(0xFF3FAE4A).copy(alpha = flick), Color(0xFF237A2E))), scr.topLeft, scr.size)
-        drawLine(Color.White.copy(alpha = 0.7f), Offset(scr.center.x, scr.top), Offset(scr.center.x, scr.bottom), strokeWidth = 1 * u)
-        drawCircle(Color.White.copy(alpha = 0.7f), 9 * u, scr.center, style = Stroke(1 * u))
-        val bx = scr.left + scr.width * (0.5f + 0.42f * sin(t * 0.9f))
-        val by = scr.top + scr.height * (0.5f + 0.35f * sin(t * 1.7f))
-        for (i in 0 until 4) {
-            val px = scr.left + scr.width * (0.5f + 0.4f * sin(t * 0.9f - 0.4f - i * 0.5f))
-            val py = scr.top + scr.height * (0.3f + 0.15f * i)
-            drawCircle(if (i % 2 == 0) Color(0xFFE53935) else Color(0xFF1E88E5), 2.2f * u, Offset(px, py))
+        // hokej: led, mantinely, červená a modré čáry, kruhy, hráči s hokejkami a puk; obrazovka trochu bliká
+        val flick = 0.92f + 0.08f * sin(t * 23f)
+        drawRect(Brush.verticalGradient(listOf(Color(0xFFEAF4FB).copy(alpha = flick), Color(0xFFC9DCEA))), scr.topLeft, scr.size)
+        // mantinel s reklamním pruhem
+        drawRect(Color(0xFF1E3A5F), scr.topLeft, Size(scr.width, 4 * u))
+        drawRect(Color(0xFFFFC107), Offset(scr.left + 8 * u, scr.top + 1 * u), Size(14 * u, 2 * u))
+        drawRect(Color(0xFFE53935), Offset(scr.left + 30 * u, scr.top + 1 * u), Size(14 * u, 2 * u))
+        drawLine(Color(0xFFD32F2F).copy(alpha = 0.8f), Offset(scr.center.x, scr.top + 4 * u), Offset(scr.center.x, scr.bottom), strokeWidth = 1.4f * u)
+        for (k in listOf(-1, 1)) {
+            val lx = scr.center.x + k * scr.width * 0.22f
+            drawLine(Color(0xFF1565C0).copy(alpha = 0.8f), Offset(lx, scr.top + 4 * u), Offset(lx, scr.bottom), strokeWidth = 1.4f * u)
+            // brankové kruhy a branky
+            drawCircle(Color(0xFFD32F2F).copy(alpha = 0.55f), 6 * u, Offset(scr.center.x + k * scr.width * 0.36f, scr.center.y + 2 * u), style = Stroke(0.8f * u))
+            val gx = scr.center.x + k * scr.width * 0.45f
+            drawRect(Color(0xFFD32F2F), Offset(gx - 1.5f * u, scr.center.y - 3 * u), Size(3 * u, 6 * u), style = Stroke(0.8f * u))
         }
-        drawCircle(Color.White, 1.8f * u, Offset(bx, by))
+        drawCircle(Color(0xFF1565C0).copy(alpha = 0.6f), 7 * u, Offset(scr.center.x, scr.center.y + 2 * u), style = Stroke(0.8f * u))
+        // puk kličkuje po ledu
+        val bx = scr.left + scr.width * (0.5f + 0.40f * sin(t * 1.3f))
+        val by = scr.top + 4 * u + (scr.height - 4 * u) * (0.55f + 0.32f * sin(t * 2.3f))
+        for (i in 0 until 4) {
+            val home = i % 2 == 0
+            val px = scr.left + scr.width * (0.5f + 0.38f * sin(t * 1.3f - 0.35f - i * 0.45f))
+            val py = scr.top + 4 * u + (scr.height - 4 * u) * (0.25f + 0.17f * i)
+            val dir = if (bx > px) 1f else -1f
+            drawLine(Color(0xFF3E2716), Offset(px, py + 1 * u), Offset(px + dir * 3.5f * u, py + 3.5f * u), strokeWidth = 0.9f * u) // hokejka
+            drawCircle(if (home) Color(0xFFD32F2F) else Color(0xFF1565C0), 2.2f * u, Offset(px, py))
+            drawCircle(Color(0xFF263238), 1.0f * u, Offset(px, py - 1.6f * u)) // helma
+        }
+        drawCircle(Color(0xFF111111), 1.5f * u, Offset(bx, by))
         if (e in 17.6f..19.6f) { // GÓL – obrazovka bliká
             drawRect(Color.White.copy(alpha = 0.35f * abs(sin(t * 14f))), scr.topLeft, scr.size)
         }
