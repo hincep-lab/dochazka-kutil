@@ -111,7 +111,6 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
     }
     LaunchedEffect(requestedTab.value) {
         val requested = requestedTab.value
-        println("POZADAVEK zpracovani: $requested")
         if (requested == "pending") {
             tab = Tab.PENDING
             detailDate = null
@@ -134,9 +133,7 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
             diag = false
             requestedTab.value = null
         } else if (requested != null && requested.startsWith("month")) {
-            println("POZADAVEK mesic vetev")
             runCatching { YearMonth.parse(requested.substringAfter("month:", "")) }.getOrNull()?.let { vm.selectedMonth.value = it }
-            println("POZADAVEK mesic nastaven")
             tab = Tab.MONTH
             detailDate = null
             requestedTab.value = null
@@ -204,6 +201,8 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
     WetBackground()
     Scaffold(
         containerColor = Color.Transparent,
+        // Text přímo na tmavém pozadí (nadpisy mimo karty) musí být světlý.
+        contentColor = Ind.onBg,
         topBar = {
             if (showTopBar) {
                 val (title, subtitle) = when {
