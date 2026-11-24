@@ -85,6 +85,9 @@ fun decorAnimationsEnabled(settingsTick: Any? = null): Boolean {
     }
 }
 
+/** Během scénky s instalatérem běží takt rychleji (plynulý pohyb postavy). */
+object WaterClockBoost { @Volatile var until: Float = -1f }
+
 /** Společný čas animací v sekundách (max. [fps] snímků/s, jen když je aplikace vidět). */
 @Composable
 fun rememberWaterClock(enabled: Boolean, fps: Int = 30): State<Float> {
@@ -102,7 +105,7 @@ fun rememberWaterClock(enabled: Boolean, fps: Int = 30): State<Float> {
                     last = ms
                     t.floatValue = acc
                 }
-                delay(frame - 8)
+                delay(if (acc < WaterClockBoost.until) 1000L / 60 - 8 else frame - 8)
             }
         }
     }

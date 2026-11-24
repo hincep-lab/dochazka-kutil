@@ -123,6 +123,7 @@ fun PlumberWorkshop(
     fixedScene: GagScene? = null,
 ) {
     val start = remember { mutableFloatStateOf(-100f) }
+    val smoother = remember { PoseSmoother() }
     val sceneIdx = remember { androidx.compose.runtime.mutableIntStateOf((Math.random() * 2).toInt()) }
     val scene = fixedScene ?: GagScene.entries[sceneIdx.intValue % 2]
     val running = { t: Float -> t - start.floatValue in 0f..endOf(scene) }
@@ -130,6 +131,7 @@ fun PlumberWorkshop(
     val begin = { t: Float ->
         sceneIdx.intValue++
         start.floatValue = t
+        WaterClockBoost.until = t + T2.END + 1f // během scénky 60 snímků/s
     }
     // automaticky: krátce po začátku práce a pak náhodně jednou za 2,5–5 minut
     LaunchedEffect(working, animate) {
@@ -165,7 +167,7 @@ fun PlumberWorkshop(
         Canvas(Modifier.fillMaxSize()) {
             val t = clock.value
             val e = fixedElapsed ?: if (animate) t - start.floatValue else -1f
-            drawWorkshop(e, t, water, pipes, scene)
+            drawWorkshop(e, t, water, pipes, scene, smoother)
         }
     }
 }
@@ -186,7 +188,7 @@ private fun sprayLevel(e: Float): Float = when {
     else -> 0f
 }
 
-private fun DrawScope.drawWorkshop(e: Float, t: Float, water: WaterState, pipes: PipeImages, scene: GagScene) {
+private fun DrawScope.drawWorkshop(e: Float, t: Float, water: WaterState, pipes: PipeImages, scene: GagScene, smoother: PoseSmoother) {
     val w = size.width
     val h = size.height
     val u = 1.dp.toPx()
@@ -214,7 +216,7 @@ private fun DrawScope.drawWorkshop(e: Float, t: Float, water: WaterState, pipes:
         // vpusť a záchod místo praskliny
         drawOval(Color(0xFF0A111C), Offset(drainX + 10 * u - 22 * u, floorY - 3 * u), Size(44 * u, 9 * u))
         drawOval(Color(0xFFB7C3D0), Offset(drainX + 10 * u - 24 * u, floorY - 4 * u), Size(48 * u, 11 * u), style = Stroke(2.5f * u))
-        drawToiletScene(e, t, floorY, pipeY, w, u)
+        drawToiletScene(e, t, floorY, pipeY, w, u, smoother)
         return
     }
     val spray = sprayLevel(e)
@@ -263,8 +265,7 @@ private fun DrawScope.drawWorkshop(e: Float, t: Float, water: WaterState, pipes:
 
     // Kutil
     if (e in 0f..T.END) {
-        val pose = poseAt(e, t, crackX, w, u)
-        drawPlumber(pose, floorY, u)
+        drawPlumber(smoother.smooth(poseAt(e, t, crackX, w, u), t, e), floorY, u)
     } else {
         // mimo scénku: jen nenápadná cedulka
         drawCircle(Color(0x33FFFFFF), 2 * u, Offset(w * 0.06f, floorY - 6 * u))
@@ -321,7 +322,7 @@ private fun DrawScope.drawSpray(o: Offset, s: Float, t: Float, floorY: Float, u:
 // Scénka 2: ucpaný záchod a zvon
 // ---------------------------------------------------------------------------------------------
 
-private fun DrawScope.drawToiletScene(e: Float, t: Float, floorY: Float, pipeY: Float, w: Float, u: Float) {
+private fun DrawScope.drawToiletScene(e: Float, t: Float, floorY: Float, pipeY: Float, w: Float, u: Float, smoother: PoseSmoother) {
     val tx = w * 0.60f
     val rimY = floorY - 40 * u
     val bowlC = Offset(tx - 10 * u, rimY)
@@ -361,7 +362,7 @@ private fun DrawScope.drawToiletScene(e: Float, t: Float, floorY: Float, pipeY: 
             }
         }
     }
-    if (e in 0f..T2.END) drawPlumber(poseToilet(e, t, tx, w, u), floorY, u)
+    if (e in 0f..T2.END) drawPlumber(smoother.smooth(poseToilet(e, t, tx, w, u), t, e), floorY, u)
 }
 
 private fun max0(v: Float) = if (v < 0f) 0f else v
@@ -419,11 +420,11 @@ private fun poseToilet(e: Float, t: Float, tx: Float, w: Float, u: Float): Pose 
         }
         e < T2.PEEK -> { lean = ease(seg(e, T2.ARRIVE, T2.PEEK)) * 0.5f; armR = 40f; grin = -0.5f }
         e < T2.GEYSER -> { // pumpuje zvonem
-            x = standX + 8 * u
+            x = standX + 14 * u
             val ph = ((e - T2.PEEK) % 0.6f) / 0.6f
-            armR = 95f + 25f * sin(ph * 2 * PI.toFloat())
-            armL = 80f + 25f * sin(ph * 2 * PI.toFloat())
-            lean = 0.35f
+            armR = 38f + 14f * sin(ph * 2 * PI.toFloat())
+            armL = 30f + 14f * sin(ph * 2 * PI.toFloat())
+            lean = 0.45f
             plungeDy = 4 * u * sin(ph * 2 * PI.toFloat())
             grin = -0.6f
         }
@@ -613,155 +614,397 @@ private fun poseAt(e: Float, t: Float, crackX: Float, w: Float, u: Float): Pose 
 // Kreslení postavičky (buclatý instalatér v lacláčích)
 // ---------------------------------------------------------------------------------------------
 
-private val Skin = Color(0xFFF2BF94)
-private val SkinDark = Color(0xFFD9976B)
-private val Overalls = Color(0xFF2F66C2)
-private val OverallsDark = Color(0xFF1E478C)
-private val Shirt = Color(0xFF7E9A86)
-private val Cap = Color(0xFFF08C12)
-private val Boot = Color(0xFF5A3A22)
-private val Ink = Color(0xFF15120F)
+// Paleta – jednotný kreslený styl: plné barvy, měkké stínování, tmavá obrysová linka.
+private val Outline = Color(0xFF241A14)
+private val Skin = Color(0xFFF4C29A)
+private val SkinShade = Color(0xFFD99670)
+private val Overalls = Color(0xFF3473D1)
+private val OverallsShade = Color(0xFF1F4C93)
+private val Shirt = Color(0xFF8FAE98)
+private val ShirtShade = Color(0xFF5F7F69)
+private val Cap = Color(0xFFF2922A)
+private val CapShade = Color(0xFFBF6410)
+private val Boot = Color(0xFF6B4428)
+private val BootShade = Color(0xFF3E2716)
+private val Hair = Color(0xFF3A2418)
+private val Ink = Color(0xFF1B1410)
+
+/** Plynulý přechod mezi pózami: každá hodnota se k cílové blíží tlumeně (žádné skoky). */
+class PoseSmoother {
+    private var cur: FloatArray? = null
+    private var lastT = 0f
+    private var lastE = -10f
+    fun smooth(target: Pose, t: Float, e: Float): Pose {
+        val v = floatArrayOf(target.x, target.armR, target.armL, target.lean, target.tilt, target.sit, target.capLift, target.capSpin, target.run, target.plungeDy, target.dazed, target.grin)
+        val c = cur
+        if (c == null || e < lastE || e - lastE > 0.5f) {
+            cur = v; lastT = t; lastE = e
+            return target
+        }
+        val dt = (t - lastT).coerceIn(0f, 0.1f)
+        lastT = t; lastE = e
+        val kFast = 1f - kotlin.math.exp(-dt * 22f)
+        val kSlow = 1f - kotlin.math.exp(-dt * 11f)
+        for (i in v.indices) {
+            val k = if (i == 0 || i == 6 || i == 7 || i == 9) kFast else kSlow
+            c[i] += (v[i] - c[i]) * k
+        }
+        return Pose(
+            c[0], target.facing, c[8], target.stride, c[1], c[2], c[3], c[4], c[5], c[6], c[7], target.wet, c[10], c[11],
+            target.wink, target.thumb, target.tape, target.eyesClosed, target.plunger, target.plungerOnFace, c[9],
+        )
+    }
+}
+
+private fun DrawScope.outlined(path: Path, fill: Brush, u: Float, w: Float = 1.6f) {
+    drawPath(path, fill)
+    drawPath(path, Outline, style = Stroke(w * u, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+}
+
+/** Končetina jako zaoblený „rukáv“ s obrysem (dva úseky přes koleno / loket). */
+private fun DrawScope.limb(a: Offset, b: Offset, c: Offset, width: Float, fill: Color, shade: Color, u: Float) {
+    val path = Path().apply { moveTo(a.x, a.y); lineTo(b.x, b.y); lineTo(c.x, c.y) }
+    drawPath(path, Outline, style = Stroke(width + 3.2f * u, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+    drawPath(path, fill, style = Stroke(width, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+    // stín na spodní straně
+    val off = Offset(0f, width * 0.22f)
+    val sh = Path().apply { moveTo(a.x + off.x, a.y + off.y); lineTo(b.x + off.x, b.y + off.y); lineTo(c.x + off.x, c.y + off.y) }
+    drawPath(sh, shade.copy(alpha = 0.55f), style = Stroke(width * 0.45f, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+}
+
+private fun polar(o: Offset, len: Float, deg: Float): Offset {
+    val r = Math.toRadians(deg.toDouble())
+    // 0° = dolů, kladné = dopředu (doprava)
+    return Offset(o.x + (len * sin(r)).toFloat(), o.y + (len * cos(r)).toFloat())
+}
 
 private fun DrawScope.drawPlumber(p: Pose, floorY: Float, u: Float) {
-    val bob = if (p.run > 0f) abs(sin(p.stride)) * 3 * u * p.run else 0f
+    val t = p.stride / 14f
+    val runCycle = p.stride * 0.95f
+    val bob = abs(sin(runCycle)) * 3.2f * u * p.run
+    val breathe = 1f + 0.025f * sin(t * 2.2f)
+    val jiggle = sin(runCycle * 2f - 0.6f) * 2.2f * u * p.run + sin(t * 2.2f) * 0.4f * u
     translate(p.x, floorY - bob + p.sit * 12 * u) {
+        // měkký stín na podlaze
+        drawOval(Brush.radialGradient(listOf(Color(0x66000000), Color.Transparent), center = Offset(0f, bob), radius = 26 * u), Offset(-26 * u, -4 * u + bob), Size(52 * u, 8 * u))
         scale(p.facing, 1f, pivot = Offset.Zero) {
-            rotate(p.tilt, pivot = Offset(0f, -10 * u)) {
-                // stín
-                drawOval(Color(0x55000000), Offset(-22 * u, -3 * u + bob), Size(44 * u, 7 * u))
-                // nohy
-                val swing = if (p.run > 0f) sin(p.stride) * 32f * p.run else 0f
-                for ((i, a) in listOf(swing, -swing).withIndex()) {
-                    val hx = if (i == 0) -7 * u else 7 * u
-                    val legLen = if (p.sit > 0f) lerp(20 * u, 14 * u, p.sit) else 20 * u
-                    val ang = if (p.sit > 0f) lerp(a, if (i == 0) -75f else -95f, p.sit) else a
-                    rotate(ang, pivot = Offset(hx, -20 * u)) {
-                        drawRoundRect(OverallsDark, Offset(hx - 5 * u, -20 * u), Size(10 * u, legLen), cornerRadius = androidx.compose.ui.geometry.CornerRadius(4 * u))
-                        drawOval(Boot, Offset(hx - 6 * u, -20 * u + legLen - 4 * u), Size(15 * u, 8 * u))
+            rotate(p.tilt + 7f * p.run, pivot = Offset(0f, -12 * u)) {
+                // ---------- nohy (stehno + lýtko, koleno se při běhu ohýbá)
+                for (side in listOf(-1, 1)) {
+                    val ph = runCycle + if (side > 0) 0f else PI.toFloat()
+                    val thigh = if (p.sit > 0f) lerp(sin(ph) * 38f * p.run, 82f, p.sit) else sin(ph) * 38f * p.run
+                    val knee = if (p.sit > 0f) lerp(max0(-sin(ph + 0.9f)) * 70f * p.run, -10f, p.sit) else max0(-sin(ph + 0.9f)) * 70f * p.run + 4f
+                    val hip = Offset(side * 6f * u, -22 * u)
+                    val k = polar(hip, 11 * u, thigh)
+                    val ankle = polar(k, 10 * u, thigh - knee)
+                    val back = side < 0
+                    val col = if (back) OverallsShade else Overalls
+                    limb(hip, k, ankle, 10 * u, col, OverallsShade, u)
+                    // bota
+                    rotate(-(thigh - knee) * 0.6f + if (p.sit > 0f) -60f * p.sit else 0f, pivot = ankle) {
+                        val boot = Path().apply {
+                            moveTo(ankle.x - 6 * u, ankle.y - 2 * u)
+                            cubicTo(ankle.x - 7 * u, ankle.y + 4 * u, ankle.x - 6 * u, ankle.y + 6 * u, ankle.x - 3 * u, ankle.y + 6 * u)
+                            lineTo(ankle.x + 9 * u, ankle.y + 6 * u)
+                            cubicTo(ankle.x + 13 * u, ankle.y + 6 * u, ankle.x + 13 * u, ankle.y + 1 * u, ankle.x + 8 * u, ankle.y)
+                            cubicTo(ankle.x + 4 * u, ankle.y - 1 * u, ankle.x + 3 * u, ankle.y - 4 * u, ankle.x + 2 * u, ankle.y - 4 * u)
+                            close()
+                        }
+                        outlined(boot, Brush.verticalGradient(listOf(if (back) BootShade else Boot, BootShade), startY = ankle.y - 4 * u, endY = ankle.y + 6 * u), u)
+                        drawLine(Color(0xFF231509), Offset(ankle.x - 4 * u, ankle.y + 5.4f * u), Offset(ankle.x + 10 * u, ankle.y + 5.4f * u), strokeWidth = 1.6f * u)
                     }
                 }
-                rotate(p.lean * 28f, pivot = Offset(0f, -20 * u)) {
-                    // zadní ruka
-                    drawArm(Offset(-13 * u, -48 * u), p.armL, u, wrench = false, thumb = false)
-                    // tričko a velké bříško v lacláčích
-                    drawOval(Shirt, Offset(-19 * u, -62 * u), Size(38 * u, 30 * u))
-                    drawOval(Overalls, Offset(-22 * u, -56 * u), Size(46 * u, 40 * u))
-                    drawOval(Color.White.copy(alpha = 0.18f), Offset(-12 * u, -52 * u), Size(18 * u, 12 * u))
-                    // náprsenka, šle, knoflíky
-                    drawRoundRect(Overalls, Offset(-10 * u, -62 * u), Size(20 * u, 14 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(3 * u))
-                    drawLine(OverallsDark, Offset(-9 * u, -61 * u), Offset(-13 * u, -70 * u), strokeWidth = 3 * u)
-                    drawLine(OverallsDark, Offset(9 * u, -61 * u), Offset(11 * u, -70 * u), strokeWidth = 3 * u)
-                    drawCircle(Cap, 2 * u, Offset(-7 * u, -59 * u)); drawCircle(Cap, 2 * u, Offset(7 * u, -59 * u))
-                    // kapsa s tužkou
-                    drawRoundRect(OverallsDark, Offset(-6 * u, -54 * u), Size(12 * u, 8 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
-                    drawLine(Color(0xFFE8C040), Offset(3 * u, -54 * u), Offset(5 * u, -60 * u), strokeWidth = 1.5f * u)
-                    // při předklonu vykoukne klasická instalatérská „spára“
+                rotate(p.lean * 30f, pivot = Offset(0f, -22 * u)) {
+                    // ---------- zadní ruka (za tělem)
+                    drawArmLimb(Offset(-6 * u, -54 * u), p.armL, u, back = true, p = p)
+                    // ---------- tělo: hruškovitý trup s bříškem dopředu
+                    val bx = 25 * u * breathe + jiggle
+                    val torso = Path().apply {
+                        moveTo(-9 * u, -60 * u)
+                        cubicTo(2 * u, -64 * u, 12 * u, -61 * u, 14 * u, -55 * u)
+                        cubicTo(bx, -48 * u, bx + 2 * u, -30 * u, 14 * u, -21 * u)
+                        cubicTo(6 * u, -16 * u, -10 * u, -16 * u, -15 * u, -22 * u)
+                        cubicTo(-20 * u, -30 * u, -19 * u, -50 * u, -9 * u, -60 * u)
+                        close()
+                    }
+                    outlined(torso, Brush.radialGradient(listOf(Shirt, ShirtShade), center = Offset(2 * u, -54 * u), radius = 26 * u), u)
+                    // lacláče – spodní část trupu + náprsenka
+                    val pants = Path().apply {
+                        moveTo(-16 * u, -40 * u)
+                        cubicTo(-6 * u, -43 * u, 8 * u, -44 * u, bx - 2 * u, -42 * u)
+                        cubicTo(bx + 2 * u, -32 * u, 20 * u, -22 * u, 14 * u, -21 * u)
+                        cubicTo(6 * u, -16 * u, -10 * u, -16 * u, -15 * u, -22 * u)
+                        cubicTo(-18 * u, -27 * u, -18 * u, -35 * u, -16 * u, -40 * u)
+                        close()
+                    }
+                    outlined(pants, Brush.radialGradient(listOf(Color(0xFF5B92E8), Overalls, OverallsShade), center = Offset(8 * u, -38 * u), radius = 28 * u), u)
+                    val bib = Path().apply {
+                        moveTo(1 * u, -43 * u); lineTo(3 * u, -56 * u); lineTo(15 * u, -55 * u)
+                        cubicTo(18 * u, -50 * u, 19 * u, -46 * u, 18 * u, -43 * u); close()
+                    }
+                    outlined(bib, Brush.verticalGradient(listOf(Overalls, OverallsShade)), u, 1.3f)
+                    // šle a mosazné knoflíky
+                    drawLine(Outline, Offset(4 * u, -55 * u), Offset(-6 * u, -61 * u), strokeWidth = 4.2f * u, cap = StrokeCap.Round)
+                    drawLine(OverallsShade, Offset(4 * u, -55 * u), Offset(-6 * u, -61 * u), strokeWidth = 2.6f * u, cap = StrokeCap.Round)
+                    for (bxx in listOf(5f, 14f)) {
+                        drawCircle(Outline, 2.1f * u, Offset(bxx * u, -53 * u))
+                        drawCircle(Color(0xFFF2C14E), 1.5f * u, Offset(bxx * u, -53 * u))
+                    }
+                    // náprsní kapsa s tužkou, šev
+                    drawLine(Color(0xFFE8C040), Offset(13 * u, -50 * u), Offset(15 * u, -55 * u), strokeWidth = 1.6f * u, cap = StrokeCap.Round)
+                    drawRoundRect(OverallsShade, Offset(7 * u, -50 * u), Size(9 * u, 6 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.5f * u))
+                    drawArc(Color(0x55FFFFFF), 200f, 90f, false, Offset(-2 * u, -42 * u), Size(22 * u, 16 * u), style = Stroke(2.2f * u, cap = StrokeCap.Round))
+                    // při předklonu vykoukne instalatérská klasika
                     if (p.lean > 0.5f) {
-                        drawArc(Skin, 180f, 180f, true, Offset(-24 * u, -34 * u), Size(10 * u, 8 * u))
-                        drawLine(Ink.copy(alpha = 0.6f), Offset(-19 * u, -34 * u), Offset(-19 * u, -30 * u), strokeWidth = 1 * u)
+                        val crack = Path().apply {
+                            moveTo(-17 * u, -36 * u); cubicTo(-19 * u, -40 * u, -14 * u, -42 * u, -12 * u, -40 * u); close()
+                        }
+                        outlined(crack, Brush.linearGradient(listOf(Skin, SkinShade)), u, 1.2f)
                     }
-                    // hlava
-                    drawHead(Offset(2 * u, -76 * u), p, u)
-                    // přední ruka (s klíčem nebo palcem)
-                    drawArm(Offset(13 * u, -50 * u), p.armR, u, wrench = !p.thumb && !p.tape && !p.plunger && !p.plungerOnFace, thumb = p.thumb, plunger = p.plunger, plungeDy = p.plungeDy)
+                    // ---------- hlava
+                    drawPlumberHead(Offset(4 * u, -74 * u), p, u, t)
+                    // ---------- přední ruka
+                    drawArmLimb(Offset(8 * u, -55 * u), p.armR, u, back = false, p = p)
                     if (p.plungerOnFace) {
-                        // zvon přisátý na obličeji
-                        val f = Offset(17 * u, -76 * u)
-                        drawLine(Color(0xFFB07A44), Offset(f.x + 6 * u, f.y), Offset(f.x + 34 * u, f.y - 3 * u), strokeWidth = 4 * u, cap = StrokeCap.Round)
-                        drawArc(Color(0xFFC62828), 90f, 180f, true, Offset(f.x - 8 * u, f.y - 10 * u), Size(18 * u, 20 * u))
-                        drawLine(Color(0xFF8E1B1B), Offset(f.x + 1 * u, f.y - 10 * u), Offset(f.x + 1 * u, f.y + 10 * u), strokeWidth = 2 * u)
+                        val f = Offset(22 * u, -73 * u)
+                        drawLine(Outline, Offset(f.x + 4 * u, f.y), Offset(f.x + 34 * u, f.y - 4 * u), strokeWidth = 5.6f * u, cap = StrokeCap.Round)
+                        drawLine(Color(0xFFC08A52), Offset(f.x + 4 * u, f.y), Offset(f.x + 34 * u, f.y - 4 * u), strokeWidth = 3.4f * u, cap = StrokeCap.Round)
+                        val cup = Path().apply {
+                            moveTo(f.x - 2 * u, f.y - 11 * u)
+                            cubicTo(f.x + 10 * u, f.y - 9 * u, f.x + 10 * u, f.y + 9 * u, f.x - 2 * u, f.y + 11 * u)
+                            close()
+                        }
+                        outlined(cup, Brush.horizontalGradient(listOf(Color(0xFF8E1B1B), Color(0xFFD63A2F)), startX = f.x - 2 * u, endX = f.x + 8 * u), u)
                     }
-                    if (p.tape) drawCircle(Color(0xFF9AA0A8), 5 * u, Offset(24 * u, -38 * u), style = Stroke(3 * u))
                 }
             }
         }
-        // létající čepice (mimo otočení postavy)
+        // létající čepice
         if (p.capLift > 0.5f) {
-            rotate(p.capSpin, pivot = Offset(4 * u, -92 * u - p.capLift)) { drawCap(Offset(4 * u, -92 * u - p.capLift), u, p.facing) }
+            rotate(p.capSpin, pivot = Offset(4 * u, -92 * u - p.capLift)) { drawPlumberCap(Offset(4 * u, -90 * u - p.capLift), u) }
         }
-        // hvězdičky nad hlavou
-        if (p.dazed > 0f) {
+        if (p.dazed > 0.05f) {
             for (i in 0 until 3) {
-                val a = p.stride * 0.4f + i * 2.1f
-                val c = Offset(4 * u + 16 * u * cos(a), -96 * u + 5 * u * sin(a))
-                drawStar(c, 4 * u, Color(0xFFFFD54A).copy(alpha = p.dazed))
+                val a = t * 5f + i * 2.1f
+                val c = Offset(4 * u + 17 * u * cos(a), -98 * u + 5 * u * sin(a))
+                drawStar(c, 4.5f * u, Color(0xFFFFD54A).copy(alpha = p.dazed.coerceIn(0f, 1f)))
             }
         }
     }
 }
 
-private fun DrawScope.drawArm(sh: Offset, angle: Float, u: Float, wrench: Boolean, thumb: Boolean, plunger: Boolean = false, plungeDy: Float = 0f) {
-    rotate(-angle, pivot = sh) {
-        drawRoundRect(Shirt, Offset(sh.x - 4 * u, sh.y), Size(8 * u, 18 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(4 * u))
-        val hand = Offset(sh.x, sh.y + 20 * u)
-        drawCircle(Skin, 4.5f * u, hand)
-        if (thumb) drawRoundRect(Skin, Offset(hand.x - 1.5f * u, hand.y - 9 * u), Size(3.5f * u, 7 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
-        if (plunger) {
-            // zvon: dřevěná násada a červená gumová hlava
-            val end = Offset(hand.x, hand.y + 30 * u + plungeDy)
-            drawLine(Color(0xFFB07A44), Offset(hand.x, hand.y - 6 * u), end, strokeWidth = 3.5f * u, cap = StrokeCap.Round)
-            drawArc(Color(0xFFC62828), 180f, 180f, true, Offset(end.x - 9 * u, end.y - 2 * u), Size(18 * u, 16 * u))
-            drawLine(Color(0xFF8E1B1B), Offset(end.x - 9 * u, end.y + 6 * u), Offset(end.x + 9 * u, end.y + 6 * u), strokeWidth = 2 * u)
+private fun DrawScope.drawArmLimb(sh: Offset, angle: Float, u: Float, back: Boolean, p: Pose) {
+    // loket se přirozeně ohýbá víc, když je ruka nahoře
+    val elbowBend = 25f + 35f * (abs(angle) / 180f)
+    val el = polar(sh, 10 * u, angle)
+    val wr = polar(el, 10 * u, angle + elbowBend * (if (angle >= 0) 1 else -1))
+    val sleeve = if (back) ShirtShade else Shirt
+    limb(sh, el, el, 8.5f * u, sleeve, ShirtShade, u)
+    limb(el, wr, wr, 6.5f * u, if (back) SkinShade else Skin, SkinShade, u)
+    val dir = Math.toDegrees(kotlin.math.atan2((wr.x - el.x).toDouble(), (wr.y - el.y).toDouble())).toFloat()
+    // palčák (dlaň s palcem)
+    rotate(-dir, pivot = wr) {
+        val hand = Path().apply {
+            moveTo(wr.x - 3.5f * u, wr.y)
+            cubicTo(wr.x - 5 * u, wr.y + 6 * u, wr.x + 5 * u, wr.y + 7 * u, wr.x + 4 * u, wr.y)
+            close()
         }
-        if (wrench) {
-            // hasák
-            drawLine(Color(0xFF8C969F), hand, Offset(hand.x, hand.y + 16 * u), strokeWidth = 3.5f * u, cap = StrokeCap.Round)
-            drawLine(Color(0xFFC62828), Offset(hand.x, hand.y + 2 * u), Offset(hand.x, hand.y + 9 * u), strokeWidth = 4.5f * u, cap = StrokeCap.Round)
-            drawArc(Color(0xFFB0BAC4), 200f, 260f, false, Offset(hand.x - 5 * u, hand.y + 14 * u), Size(10 * u, 9 * u), style = Stroke(3 * u))
+        outlined(hand, Brush.verticalGradient(listOf(if (back) SkinShade else Skin, SkinShade)), u, 1.3f)
+        if (!back && p.thumb) {
+            val th = Path().apply {
+                moveTo(wr.x + 2 * u, wr.y + 1 * u)
+                cubicTo(wr.x + 2 * u, wr.y - 7 * u, wr.x + 6 * u, wr.y - 7 * u, wr.x + 5 * u, wr.y + 1 * u)
+                close()
+            }
+            outlined(th, Brush.verticalGradient(listOf(Skin, SkinShade)), u, 1.3f)
+        }
+        if (!back) {
+            val tip = Offset(wr.x, wr.y + 4 * u)
+            val wrench = !p.thumb && !p.tape && !p.plunger && !p.plungerOnFace
+            if (wrench) {
+                drawLine(Outline, tip, Offset(tip.x, tip.y + 17 * u), strokeWidth = 5f * u, cap = StrokeCap.Round)
+                drawLine(Color(0xFFD63A2F), tip, Offset(tip.x, tip.y + 8 * u), strokeWidth = 3.4f * u, cap = StrokeCap.Round)
+                drawLine(Color(0xFF9AA6B2), Offset(tip.x, tip.y + 8 * u), Offset(tip.x, tip.y + 16 * u), strokeWidth = 3.4f * u, cap = StrokeCap.Round)
+                val jaw = Path().apply {
+                    moveTo(tip.x - 2 * u, tip.y + 15 * u)
+                    cubicTo(tip.x - 7 * u, tip.y + 17 * u, tip.x - 6 * u, tip.y + 24 * u, tip.x, tip.y + 23 * u)
+                    lineTo(tip.x - 1 * u, tip.y + 20 * u)
+                    cubicTo(tip.x - 3 * u, tip.y + 20 * u, tip.x - 3 * u, tip.y + 17 * u, tip.x + 1 * u, tip.y + 17 * u)
+                    close()
+                }
+                outlined(jaw, Brush.linearGradient(listOf(Color(0xFFDCE4EC), Color(0xFF7D8894))), u, 1.2f)
+            }
+            if (p.plunger) {
+                val end = Offset(tip.x, tip.y + 28 * u + p.plungeDy)
+                drawLine(Outline, Offset(tip.x, tip.y - 8 * u), end, strokeWidth = 5f * u, cap = StrokeCap.Round)
+                drawLine(Color(0xFFC08A52), Offset(tip.x, tip.y - 8 * u), end, strokeWidth = 3.2f * u, cap = StrokeCap.Round)
+                val cup = Path().apply {
+                    moveTo(end.x - 10 * u, end.y + 9 * u)
+                    cubicTo(end.x - 9 * u, end.y - 1 * u, end.x + 9 * u, end.y - 1 * u, end.x + 10 * u, end.y + 9 * u)
+                    close()
+                }
+                outlined(cup, Brush.verticalGradient(listOf(Color(0xFFD63A2F), Color(0xFF8E1B1B)), startY = end.y, endY = end.y + 9 * u), u)
+            }
+            if (p.tape) {
+                drawCircle(Outline, 6.4f * u, Offset(tip.x, tip.y + 3 * u), style = Stroke(4.6f * u))
+                drawCircle(Color(0xFFA9AFB7), 6.4f * u, Offset(tip.x, tip.y + 3 * u), style = Stroke(3f * u))
+            }
         }
     }
 }
 
-private fun DrawScope.drawHead(c: Offset, p: Pose, u: Float) {
-    // ucho, hlava, tváře
-    drawCircle(SkinDark, 4 * u, Offset(c.x - 12 * u, c.y + 1 * u))
-    drawCircle(Skin, 15 * u, c)
-    drawCircle(Color(0x55FF6F61), 4 * u, Offset(c.x + 7 * u, c.y + 5 * u))
-    // strniště
-    for (i in 0 until 9) drawCircle(Ink.copy(alpha = 0.18f), 0.7f * u, Offset(c.x - 6 * u + i * 2.4f * u, c.y + 10 * u + (i % 2) * 1.5f * u))
-    // oči
-    if (p.eyesClosed || p.dazed > 0.5f) {
-        drawLine(Ink, Offset(c.x + 1 * u, c.y - 4 * u), Offset(c.x + 6 * u, c.y - 1 * u), strokeWidth = 1.6f * u)
-        drawLine(Ink, Offset(c.x + 1 * u, c.y - 1 * u), Offset(c.x + 6 * u, c.y - 4 * u), strokeWidth = 1.6f * u)
+private fun DrawScope.drawPlumberHead(c: Offset, p: Pose, u: Float, t: Float) {
+    // krk / podbradek, ucho, hlava s tvářemi
+    val head = Path().apply {
+        moveTo(c.x - 12 * u, c.y - 4 * u)
+        cubicTo(c.x - 13 * u, c.y - 16 * u, c.x + 10 * u, c.y - 19 * u, c.x + 13 * u, c.y - 6 * u)
+        cubicTo(c.x + 16 * u, c.y + 2 * u, c.x + 15 * u, c.y + 10 * u, c.x + 8 * u, c.y + 13 * u)
+        cubicTo(c.x + 2 * u, c.y + 16 * u, c.x - 8 * u, c.y + 15 * u, c.x - 11 * u, c.y + 8 * u)
+        cubicTo(c.x - 13 * u, c.y + 4 * u, c.x - 12 * u, c.y, c.x - 12 * u, c.y - 4 * u)
+        close()
+    }
+    outlined(head, Brush.radialGradient(listOf(Color(0xFFFAD3B0), Skin, SkinShade), center = Offset(c.x + 3 * u, c.y - 4 * u), radius = 18 * u), u)
+    // strniště na bradě (jemný stín místo teček)
+    val jaw = Path().apply {
+        moveTo(c.x - 9 * u, c.y + 6 * u)
+        cubicTo(c.x - 4 * u, c.y + 15 * u, c.x + 8 * u, c.y + 14 * u, c.x + 12 * u, c.y + 6 * u)
+        cubicTo(c.x + 6 * u, c.y + 9 * u, c.x - 3 * u, c.y + 9 * u, c.x - 9 * u, c.y + 6 * u)
+        close()
+    }
+    drawPath(jaw, Color(0x33402A1C))
+    // ucho
+    val ear = Path().apply {
+        moveTo(c.x - 9 * u, c.y - 3 * u)
+        cubicTo(c.x - 16 * u, c.y - 6 * u, c.x - 16 * u, c.y + 5 * u, c.x - 9 * u, c.y + 4 * u)
+        close()
+    }
+    outlined(ear, Brush.radialGradient(listOf(Skin, SkinShade), center = Offset(c.x - 12 * u, c.y), radius = 6 * u), u, 1.3f)
+    drawArc(SkinShade, 120f, 140f, false, Offset(c.x - 14 * u, c.y - 2 * u), Size(5 * u, 5 * u), style = Stroke(1 * u))
+    // vlasy na spáncích
+    drawPath(Path().apply {
+        moveTo(c.x - 11 * u, c.y - 6 * u); cubicTo(c.x - 13 * u, c.y - 10 * u, c.x - 8 * u, c.y - 12 * u, c.x - 5 * u, c.y - 10 * u); close()
+    }, Hair)
+    // tvář
+    drawOval(Brush.radialGradient(listOf(Color(0x88FF7A6B), Color.Transparent), center = Offset(c.x + 7 * u, c.y + 3 * u), radius = 6 * u), Offset(c.x + 1 * u, c.y - 3 * u), Size(12 * u, 12 * u))
+    // oči (mrkání každé ~3,5 s)
+    val blink = ((t % 3.5f) > 3.38f) || p.eyesClosed || p.dazed > 0.5f
+    val eyeL = Offset(c.x + 4 * u, c.y - 4 * u)
+    val eyeR = Offset(c.x + 11 * u, c.y - 4.5f * u)
+    if (blink) {
+        if (p.dazed > 0.5f) {
+            for (eo in listOf(eyeL, eyeR)) {
+                drawLine(Ink, Offset(eo.x - 2.4f * u, eo.y - 2.4f * u), Offset(eo.x + 2.4f * u, eo.y + 2.4f * u), strokeWidth = 1.5f * u, cap = StrokeCap.Round)
+                drawLine(Ink, Offset(eo.x - 2.4f * u, eo.y + 2.4f * u), Offset(eo.x + 2.4f * u, eo.y - 2.4f * u), strokeWidth = 1.5f * u, cap = StrokeCap.Round)
+            }
+        } else {
+            for (eo in listOf(eyeL, eyeR)) drawArc(Ink, 20f, 140f, false, Offset(eo.x - 3 * u, eo.y - 2 * u), Size(6 * u, 4 * u), style = Stroke(1.5f * u, cap = StrokeCap.Round))
+        }
     } else {
-        drawCircle(Color.White, 4 * u, Offset(c.x + 3 * u, c.y - 3 * u))
-        drawCircle(Ink, 1.8f * u, Offset(c.x + 4.5f * u, c.y - 2.5f * u))
-        if (p.wink) drawLine(Ink, Offset(c.x + 9 * u, c.y - 3 * u), Offset(c.x + 14 * u, c.y - 3 * u), strokeWidth = 1.6f * u)
-        else { drawCircle(Color.White, 3.6f * u, Offset(c.x + 11 * u, c.y - 3 * u)); drawCircle(Ink, 1.6f * u, Offset(c.x + 12.2f * u, c.y - 2.5f * u)) }
+        for ((i, eo) in listOf(eyeL, eyeR).withIndex()) {
+            if (i == 1 && p.wink) {
+                drawArc(Ink, 200f, 140f, false, Offset(eo.x - 3 * u, eo.y - 1 * u), Size(6 * u, 4 * u), style = Stroke(1.5f * u, cap = StrokeCap.Round))
+                continue
+            }
+            drawOval(Color.White, Offset(eo.x - 2.8f * u, eo.y - 3.6f * u), Size(5.6f * u, 7.2f * u))
+            drawOval(Outline, Offset(eo.x - 2.8f * u, eo.y - 3.6f * u), Size(5.6f * u, 7.2f * u), style = Stroke(1.1f * u))
+            val look = if (p.grin < -0.4f) Offset(0.6f * u, 1.2f * u) else Offset(1.1f * u, 0f)
+            drawOval(Color(0xFF3B2A1E), Offset(eo.x - 1.6f * u + look.x, eo.y - 1.9f * u + look.y), Size(3.2f * u, 4 * u))
+            drawCircle(Color.White, 0.8f * u, Offset(eo.x - 0.4f * u + look.x, eo.y - 1 * u + look.y))
+        }
     }
-    // obočí
-    drawLine(Ink, Offset(c.x - 1 * u, c.y - 9 * u), Offset(c.x + 6 * u, c.y - 10 * u + p.grin * 1.5f * u), strokeWidth = 2 * u, cap = StrokeCap.Round)
-    // velký červený nos
-    drawOval(Color(0xFFE35D4F), Offset(c.x + 8 * u, c.y - 1 * u), Size(11 * u, 9 * u))
-    drawCircle(Color.White.copy(alpha = 0.5f), 1.5f * u, Offset(c.x + 11 * u, c.y + 1 * u))
-    // pusa
-    if (p.grin > 0.2f) drawArc(Ink, 10f, 160f, false, Offset(c.x + 1 * u, c.y + 4 * u), Size(10 * u, 7 * u), style = Stroke(1.6f * u))
-    else if (p.grin < -0.2f) drawLine(Ink, Offset(c.x + 2 * u, c.y + 10 * u), Offset(c.x + 9 * u, c.y + 9 * u), strokeWidth = 1.6f * u)
-    else drawOval(Ink, Offset(c.x + 4 * u, c.y + 8 * u), Size(4 * u, 3 * u))
-    // hustý knír
-    drawOval(Color(0xFF2A1A12), Offset(c.x + 2 * u, c.y + 4 * u), Size(10 * u, 5 * u))
-    drawOval(Color(0xFF2A1A12), Offset(c.x + 9 * u, c.y + 4 * u), Size(9 * u, 5 * u))
-    // čepice na hlavě
-    if (p.capLift <= 0.5f) drawCap(Offset(c.x + 2 * u, c.y - 16 * u), u, 1f)
-    else { // rozcuchané vlasy bez čepice
-        for (i in -3..3) drawLine(Color(0xFF2A1A12), Offset(c.x + i * 3 * u, c.y - 13 * u), Offset(c.x + i * 4 * u, c.y - 19 * u), strokeWidth = 1.6f * u)
+    // husté obočí
+    val browLift = if (p.grin < -0.4f) -1.5f * u else if (p.grin > 0.5f) -1f * u else 0f
+    for ((i, eo) in listOf(eyeL, eyeR).withIndex()) {
+        val br = Path().apply {
+            moveTo(eo.x - 3.5f * u, eo.y - 5 * u + browLift + if (i == 0 && p.grin < -0.4f) 1.5f * u else 0f)
+            quadraticTo(eo.x, eo.y - 7.5f * u + browLift, eo.x + 3.5f * u, eo.y - 5.5f * u + browLift)
+        }
+        drawPath(br, Hair, style = Stroke(2.2f * u, cap = StrokeCap.Round))
     }
-    // mokrý obličej
+    // velký baňatý nos
+    val nose = Path().apply {
+        moveTo(c.x + 12 * u, c.y - 3 * u)
+        cubicTo(c.x + 22 * u, c.y - 5 * u, c.x + 23 * u, c.y + 5 * u, c.x + 15 * u, c.y + 5 * u)
+        cubicTo(c.x + 11 * u, c.y + 5 * u, c.x + 9 * u, c.y + 1 * u, c.x + 12 * u, c.y - 3 * u)
+        close()
+    }
+    outlined(nose, Brush.radialGradient(listOf(Color(0xFFF07A6A), Color(0xFFCF4E40)), center = Offset(c.x + 16 * u, c.y - 1 * u), radius = 7 * u), u)
+    drawOval(Color.White.copy(alpha = 0.6f), Offset(c.x + 15 * u, c.y - 2 * u), Size(3 * u, 2 * u))
+    // ústa
+    when {
+        p.grin > 0.2f -> {
+            val m = Path().apply {
+                moveTo(c.x + 3 * u, c.y + 8 * u)
+                cubicTo(c.x + 6 * u, c.y + 14 * u, c.x + 13 * u, c.y + 13 * u, c.x + 15 * u, c.y + 8 * u)
+                close()
+            }
+            outlined(m, Brush.verticalGradient(listOf(Color(0xFF7A2A22), Color(0xFF4A1410))), u, 1.2f)
+            drawRect(Color.White, Offset(c.x + 7 * u, c.y + 8 * u), Size(5 * u, 1.8f * u))
+        }
+        p.grin < -0.2f -> drawArc(Ink, 200f, 140f, false, Offset(c.x + 5 * u, c.y + 9 * u), Size(8 * u, 5 * u), style = Stroke(1.5f * u, cap = StrokeCap.Round))
+        else -> drawOval(Color(0xFF4A1410), Offset(c.x + 7 * u, c.y + 9 * u), Size(4 * u, 3 * u))
+    }
+    // zatočený knír
+    val wob = sin(t * 3f) * 0.4f * u
+    val mus = Path().apply {
+        moveTo(c.x + 11 * u, c.y + 5 * u)
+        cubicTo(c.x + 7 * u, c.y + 4 * u, c.x + 3 * u, c.y + 6 * u, c.x + 1 * u, c.y + 9 * u + wob)
+        cubicTo(c.x - 1 * u, c.y + 11 * u, c.x - 3 * u, c.y + 9 * u, c.x - 1 * u, c.y + 7 * u)
+        cubicTo(c.x - 4 * u, c.y + 10 * u, c.x + 4 * u, c.y + 11 * u, c.x + 11 * u, c.y + 8 * u)
+        cubicTo(c.x + 18 * u, c.y + 11 * u, c.x + 24 * u, c.y + 10 * u, c.x + 21 * u, c.y + 7 * u)
+        cubicTo(c.x + 23 * u, c.y + 9 * u, c.x + 21 * u, c.y + 11 * u, c.x + 19 * u, c.y + 9 * u + wob)
+        cubicTo(c.x + 17 * u, c.y + 6 * u, c.x + 14 * u, c.y + 4 * u, c.x + 11 * u, c.y + 5 * u)
+        close()
+    }
+    outlined(mus, Brush.verticalGradient(listOf(Color(0xFF55372A), Hair), startY = c.y + 4 * u, endY = c.y + 11 * u), u, 1.2f)
+    // čepice nebo rozcuchané vlasy
+    if (p.capLift <= 0.5f) drawPlumberCap(Offset(c.x + 1 * u, c.y - 13 * u), u)
+    else {
+        val hair = Path().apply {
+            moveTo(c.x - 11 * u, c.y - 8 * u)
+            for (i in 0..6) {
+                val x = c.x - 9 * u + i * 3.5f * u
+                lineTo(x, c.y - 20 * u - (i % 2) * 3 * u)
+                lineTo(x + 1.7f * u, c.y - 14 * u)
+            }
+            lineTo(c.x + 12 * u, c.y - 8 * u); close()
+        }
+        outlined(hair, Brush.verticalGradient(listOf(Color(0xFF55372A), Hair)), u, 1.2f)
+    }
+    // mokrý obličej – kapky stékají
     if (p.wet) {
         for (i in 0 until 3) {
-            val y = c.y - 6 * u + ((p.stride * 0.5f + i * 0.33f) % 1f) * 18 * u
-            drawDrop(Offset(c.x - 8 * u + i * 8 * u, y), 1.6f * u, 1.3f)
+            val y = c.y - 8 * u + ((t * 0.7f + i * 0.33f) % 1f) * 20 * u
+            drawDrop(Offset(c.x - 6 * u + i * 8 * u, y), 1.5f * u, 1.3f)
         }
     }
 }
 
-private fun DrawScope.drawCap(c: Offset, u: Float, facing: Float) {
-    drawArc(Cap, 180f, 180f, true, Offset(c.x - 14 * u, c.y - 8 * u), Size(28 * u, 18 * u))
-    drawRoundRect(Color(0xFFC46A04), Offset(c.x + 4 * u * facing - (if (facing < 0) 16 * u else 0f), c.y - 1 * u), Size(16 * u, 4 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2 * u))
-    drawCircle(Color.White, 3.5f * u, Offset(c.x - 2 * u, c.y - 3 * u))
-    drawLine(Cap, Offset(c.x - 3.5f * u, c.y - 5 * u), Offset(c.x - 3.5f * u, c.y - 1 * u), strokeWidth = 1 * u)
-    drawLine(Cap, Offset(c.x - 3.5f * u, c.y - 3 * u), Offset(c.x - 0.5f * u, c.y - 5 * u), strokeWidth = 1 * u)
-    drawLine(Cap, Offset(c.x - 3.5f * u, c.y - 3 * u), Offset(c.x - 0.5f * u, c.y - 1 * u), strokeWidth = 1 * u)
+private fun DrawScope.drawPlumberCap(c: Offset, u: Float) {
+    val dome = Path().apply {
+        moveTo(c.x - 13 * u, c.y + 3 * u)
+        cubicTo(c.x - 14 * u, c.y - 10 * u, c.x + 12 * u, c.y - 12 * u, c.x + 13 * u, c.y + 2 * u)
+        close()
+    }
+    outlined(dome, Brush.radialGradient(listOf(Color(0xFFFFB45C), Cap, CapShade), center = Offset(c.x - 3 * u, c.y - 5 * u), radius = 16 * u), u)
+    drawLine(CapShade, Offset(c.x - 1 * u, c.y - 8 * u), Offset(c.x + 1 * u, c.y + 2 * u), strokeWidth = 1 * u)
+    drawCircle(Outline, 1.8f * u, Offset(c.x - 1 * u, c.y - 8.5f * u))
+    drawCircle(Cap, 1.1f * u, Offset(c.x - 1 * u, c.y - 8.5f * u))
+    // kšilt
+    val brim = Path().apply {
+        moveTo(c.x + 8 * u, c.y + 1 * u)
+        cubicTo(c.x + 16 * u, c.y - 1 * u, c.x + 23 * u, c.y + 1 * u, c.x + 24 * u, c.y + 4 * u)
+        cubicTo(c.x + 18 * u, c.y + 6 * u, c.x + 12 * u, c.y + 5 * u, c.x + 8 * u, c.y + 4 * u)
+        close()
+    }
+    outlined(brim, Brush.verticalGradient(listOf(Cap, CapShade)), u)
+    // logo K
+    drawCircle(Color.White, 3.6f * u, Offset(c.x - 4 * u, c.y - 3 * u))
+    drawCircle(Outline, 3.6f * u, Offset(c.x - 4 * u, c.y - 3 * u), style = Stroke(0.9f * u))
+    drawLine(CapShade, Offset(c.x - 5.3f * u, c.y - 5.2f * u), Offset(c.x - 5.3f * u, c.y - 0.8f * u), strokeWidth = 1.1f * u)
+    drawLine(CapShade, Offset(c.x - 5.3f * u, c.y - 3 * u), Offset(c.x - 2.4f * u, c.y - 5.2f * u), strokeWidth = 1.1f * u)
+    drawLine(CapShade, Offset(c.x - 5.3f * u, c.y - 3 * u), Offset(c.x - 2.4f * u, c.y - 0.8f * u), strokeWidth = 1.1f * u)
+    drawArc(Color(0x66FFFFFF), 200f, 70f, false, Offset(c.x - 10 * u, c.y - 9 * u), Size(16 * u, 12 * u), style = Stroke(1.5f * u, cap = StrokeCap.Round))
 }
 
 private fun DrawScope.drawStar(c: Offset, r: Float, color: Color) {
