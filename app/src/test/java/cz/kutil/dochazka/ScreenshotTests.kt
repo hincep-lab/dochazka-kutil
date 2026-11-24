@@ -206,6 +206,49 @@ class ScreenshotTests {
     @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
     fun stageWander() = stage("18_prochazka", cz.kutil.dochazka.ui.Act.WANDER, listOf(2f, 5f, 8f))
 
+    /**
+     * Ukázkové video (snímky 24/s) – běží jen když je nastavené MAKE_VIDEO=1.
+     * Přehled v přesčasu: přetéká nádoba, kape kohoutek a Kutil hraje dvě scénky.
+     */
+    @Test
+    @Config(qualifiers = "w412dp-h915dp-xxhdpi")
+    fun demoVideo() {
+        org.junit.Assume.assumeTrue(System.getenv("MAKE_VIDEO") == "1")
+        cz.kutil.dochazka.ui.PlumberDebug.forcedOrder = listOf(cz.kutil.dochazka.ui.Act.PIPE, cz.kutil.dochazka.ui.Act.TUB)
+        val fps = 24
+        var frame = 0
+        cz.kutil.dochazka.ui.SoundTap.listener = { name -> println("SOUND_EVENT $frame $name") }
+        val state = craftedState(open = true, pending = false, hoursAgo = 8.1)
+        val vm = MainViewModel(ApplicationProvider.getApplicationContext())
+        val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+        activity.setContent {
+            DochazkaTheme {
+                Box(Modifier.fillMaxSize()) {
+                    WetBackground()
+                    Box(Modifier.statusBarsPadding()) {
+                        HomeScreen(vm, state, onOpenDay = {}, onOpenTab = {}, onEndWork = {}, onOpenDiag = {})
+                    }
+                }
+            }
+        }
+        val dir = File("build/video").apply { mkdirs() }
+        val total = (42.5 * fps).toInt()
+        val view = activity.window.decorView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        while (frame < total) {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1000L / fps))
+            bmp.eraseColor(android.graphics.Color.BLACK)
+            view.draw(canvas)
+            val small = Bitmap.createScaledBitmap(bmp, 720, bmp.height * 720 / bmp.width / 2 * 2, true)
+            File(dir, "f%05d.jpg".format(frame)).outputStream().use { small.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+            small.recycle()
+            frame++
+        }
+        cz.kutil.dochazka.ui.SoundTap.listener = null
+        cz.kutil.dochazka.ui.PlumberDebug.forcedOrder = null
+    }
+
     /** Celá aplikace s lištami nad ukázkovými daty (demo režim). */
     private fun app(name: String, tab: String?) {
         val vm = MainViewModel(ApplicationProvider.getApplicationContext())

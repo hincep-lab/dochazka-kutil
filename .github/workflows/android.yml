@@ -12,6 +12,9 @@ concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  MAKE_VIDEO: ${{ contains(github.event.head_commit.message, '[video]') && '1' || '0' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -84,6 +87,18 @@ jobs:
           name: screenshots
           path: app/build/screenshots/*.png
           if-no-files-found: ignore
+
+      - name: Ukázkové video (jen když commit obsahuje [video])
+        if: always() && github.ref != 'refs/heads/main'
+        run: |
+          if ls app/build/video/f*.jpg >/dev/null 2>&1; then
+            sudo apt-get install -y -qq ffmpeg >/dev/null
+            ffmpeg -loglevel error -framerate 24 -i app/build/video/f%05d.jpg -c:x libx264 -preset veryfast -crf 27 -pix_fmt yuv420p /tmp/demo.mp4
+            ls -la /tmp/demo.mp4
+            echo "VIDEO_BEGIN"
+            base64 -w 200 /tmp/demo.mp4
+            echo "VIDEO_END"
+          fi
 
       - name: Snímky obrazovek do záznamu (pro kontrolu vzhledu)
         if: always() && github.ref != 'refs/heads/main'

@@ -24,6 +24,11 @@ import cz.kutil.dochazka.data.AppPrefs
  *  - telefon není v tichém režimu ani na vibracích,
  *  - aplikace je na obrazovce (při odchodu z aplikace se vše zastaví).
  */
+/** Jen pro testy: záznam, kdy aplikace přehrála jaký zvuk (pro ozvučení ukázkového videa). */
+object SoundTap {
+    @Volatile var listener: ((String) -> Unit)? = null
+}
+
 class WaterSounds(ctx: Context) {
     private val audio = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val pool = SoundPool.Builder()
@@ -53,6 +58,7 @@ class WaterSounds(ctx: Context) {
 
     /** Zvuky scénky s instalatérem. */
     fun gag(s: GagSound) {
+        SoundTap.listener?.invoke(s.name)
         if (!allowed()) {
             stopSpray(); return
         }
@@ -79,10 +85,12 @@ class WaterSounds(ctx: Context) {
     private fun allowed() = audio.ringerMode == AudioManager.RINGER_MODE_NORMAL
 
     fun drip() {
+        SoundTap.listener?.invoke("DRIP")
         if (allowed()) pool.play(drip, 0.22f, 0.22f, 1, 0, 0.96f + Math.random().toFloat() * 0.08f)
     }
 
     fun overflow(on: Boolean) {
+        SoundTap.listener?.invoke(if (on) "OVERFLOW_ON" else "OVERFLOW_OFF")
         if (on && allowed()) {
             if (overflowStream == 0) overflowStream = pool.play(overflow, 0.14f, 0.14f, 0, -1, 1f)
         } else if (overflowStream != 0) {

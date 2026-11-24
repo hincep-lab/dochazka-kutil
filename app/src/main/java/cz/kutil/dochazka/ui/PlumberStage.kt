@@ -65,6 +65,11 @@ private fun eventsOf(a: Act): List<Pair<Float, GagSound>> = when (a) {
     Act.WANDER -> emptyList()
 }
 
+/** Jen pro natáčení ukázkového videa v testech: pevné pořadí scének bez procházek. */
+object PlumberDebug {
+    @Volatile var forcedOrder: List<Act>? = null
+}
+
 /** Výška jeviště (spodní část přehledu). */
 val StageHeight = 190.dp
 
@@ -85,12 +90,14 @@ fun PlumberStage(
     // režisér: scénky se střídají samy, mezi nimi se Kutil občas jen projde
     LaunchedEffect(animate, fixedAct) {
         if (!animate || fixedAct != null) return@LaunchedEffect
-        val order = SCENES.shuffled().toMutableList()
+        val forced = PlumberDebug.forcedOrder?.toMutableList()
+        val order = forced ?: SCENES.shuffled().toMutableList()
         var nextAt = clock.value + 2.5f
         var sinceScene = 0
         snapshotFlow { clock.value }.collect { t ->
             if (t < nextAt) return@collect
-            val next = if (sinceScene == 0 && Math.random() < 0.55) {
+            if (forced != null && order.isEmpty()) return@collect
+            val next = if (forced == null && sinceScene == 0 && Math.random() < 0.55) {
                 Act.WANDER
             } else {
                 if (order.isEmpty()) order += SCENES.shuffled()
@@ -100,7 +107,7 @@ fun PlumberStage(
             act.intValue = next.ordinal
             variant.intValue = (Math.random() * 3).toInt()
             start.floatValue = t
-            nextAt = t + next.length + 3f + (Math.random() * 6).toFloat()
+            nextAt = t + next.length + if (forced != null) 1f else 3f + (Math.random() * 6).toFloat()
         }
     }
     // zvuky ve správných okamžicích
