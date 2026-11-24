@@ -13,5 +13,7 @@ class App : Application() {
         ZoneHealthWorker.ensureScheduled(this)
         MonthlyReminderWorker.ensureScheduled(this)
         LongShiftWorker.ensureScheduled(this)
+        cz.kutil.dochazka.update.UpdateWorker.ensureScheduled(this)
+        cz.kutil.dochazka.data.AutoBackup.ensureScheduled(this)
     }
 }

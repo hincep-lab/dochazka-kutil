@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cz.kutil.dochazka.core.DayFlag
 import cz.kutil.dochazka.core.DaySummary
 import cz.kutil.dochazka.core.DocxExporter
+import cz.kutil.dochazka.core.FormPainter
 import cz.kutil.dochazka.core.OverrideType
 import cz.kutil.dochazka.core.PRAGUE
 import cz.kutil.dochazka.core.WorkCalc
@@ -62,6 +63,7 @@ import java.time.LocalTime
 import java.time.YearMonth
 
 const val DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+const val PDF_MIME = "application/pdf"
 
 /** Dny, ve kterých něco čeká na potvrzení: nevyřízený návrh nebo neuzavřená směna. */
 private fun unconfirmedDates(state: UiState): Set<LocalDate> {
@@ -80,6 +82,9 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
     var exportDialog by remember { mutableStateOf(false) }
     var vacationDialog by remember { mutableStateOf(false) }
 
+    val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(PDF_MIME)) { uri ->
+        if (uri != null) vm.exportPdf(uri, ym)
+    }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(DOCX_MIME)) { uri ->
         if (uri != null) vm.export(uri, ym)
     }
@@ -168,14 +173,32 @@ fun MonthScreen(vm: MainViewModel, state: UiState, onOpenDay: (LocalDate) -> Uni
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
-                    Button(onClick = {
-                        exportDialog = false
-                        vm.shareByEmail(ym)
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Odeslat e-mailem") }
-                    OutlinedButton(onClick = {
-                        exportDialog = false
-                        exportLauncher.launch(DocxExporter.fileName(ym))
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Uložit do telefonu") }
+                    Text("Odeslat e-mailem", fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            exportDialog = false
+                            vm.shareByEmail(ym)
+                        }, modifier = Modifier.weight(1f)) { Text("Word") }
+                        Button(onClick = {
+                            exportDialog = false
+                            vm.shareByEmail(ym, pdf = true)
+                        }, modifier = Modifier.weight(1f)) { Text("PDF") }
+                    }
+                    Text("Uložit do telefonu", fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = {
+                            exportDialog = false
+                            exportLauncher.launch(DocxExporter.fileName(ym))
+                        }, modifier = Modifier.weight(1f)) { Text("Word") }
+                        OutlinedButton(onClick = {
+                            exportDialog = false
+                            pdfLauncher.launch(FormPainter.fileName(ym))
+                        }, modifier = Modifier.weight(1f)) { Text("PDF") }
+                    }
+                    Text(
+                        "Word je vyplněný původní formulář. PDF je jeho věrné překreslení pro tisk a odeslání bez Wordu.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                     Text(
                         "E-mail se otevře ve tvé poštovní aplikaci s přiloženým výkazem; odeslání potvrdíš tam. Příjemce nastavíš v Nastavení.",
                         style = MaterialTheme.typography.bodySmall,

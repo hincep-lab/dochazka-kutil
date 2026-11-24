@@ -133,7 +133,7 @@ fun AppRoot(vm: MainViewModel, requestedTab: MutableState<String?>) {
         if (req != null) {
             vm.share.value = null
             val intent = Intent(Intent.ACTION_SEND).apply {
-                type = DOCX_MIME
+                type = req.mime
                 putExtra(Intent.EXTRA_STREAM, req.uri)
                 if (req.email.isNotBlank()) putExtra(Intent.EXTRA_EMAIL, arrayOf(req.email))
                 putExtra(Intent.EXTRA_SUBJECT, req.subject)

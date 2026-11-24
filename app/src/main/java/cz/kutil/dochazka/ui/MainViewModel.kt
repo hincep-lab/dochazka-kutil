@@ -17,7 +17,11 @@ import cz.kutil.dochazka.core.TrackEvent
 import cz.kutil.dochazka.core.WorkCalc
 import androidx.core.content.FileProvider
 import cz.kutil.dochazka.data.AppPrefs
+import cz.kutil.dochazka.data.AutoBackup
 import cz.kutil.dochazka.data.Backup
+import cz.kutil.dochazka.data.PdfExporter
+import cz.kutil.dochazka.core.FormPainter
+import cz.kutil.dochazka.update.Updater
 import java.io.File
 import cz.kutil.dochazka.data.DayOverrideEntity
 import cz.kutil.dochazka.data.Graph
@@ -88,7 +92,18 @@ data class UiState(
 
 data class RestorePreview(val uri: Uri, val shifts: Int, val pending: Int, val overrides: Int, val exportedAt: Long, val currentShifts: Int)
 
-data class ShareRequest(val uri: Uri, val email: String, val subject: String, val body: String)
+data class ShareRequest(val uri: Uri, val email: String, val subject: String, val body: String, val mime: String = DOCX_MIME)
+
+/** Stav aktualizace v Nastavení. */
+sealed interface UpdateState {
+    data object Idle : UpdateState
+    data object Checking : UpdateState
+    data class UpToDate(val build: Int) : UpdateState
+    data class Available(val release: cz.kutil.dochazka.update.ReleaseInfo) : UpdateState
+    data class Downloading(val release: cz.kutil.dochazka.update.ReleaseInfo, val progress: Float) : UpdateState
+    data class Ready(val release: cz.kutil.dochazka.update.ReleaseInfo, val file: File) : UpdateState
+    data class Failed(val message: String) : UpdateState
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -98,6 +113,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Požadavek na otevření e-mailu s přiloženým výkazem (zpracuje ho obrazovka). */
     val share = MutableStateFlow<ShareRequest?>(null)
+
+    val update = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val selectedMonth = MutableStateFlow(YearMonth.now(PRAGUE))
 
     /** Ověřená záloha čekající na potvrzení obnovy. */
@@ -347,15 +364,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * Vyplní formulář do dočasného souboru a otevře výběr e-mailové aplikace s přílohou.
      * Samotné odeslání potvrzuje uživatel ve své poštovní aplikaci – aplikace sama nic neposílá.
      */
-    fun shareByEmail(ym: YearMonth) = launchSafe {
+    fun shareByEmail(ym: YearMonth, pdf: Boolean = false) = launchSafe {
         val st = state.value
         val (file, report) = withContext(Dispatchers.IO) {
             val template = ctx.assets.open(TEMPLATE_ASSET).use { it.readBytes() }
-            val (bytes, rep) = DocxExporter.export(template, st.month(ym), ExportHeader(st.settings.organization, st.settings.employee))
+            val summary = st.month(ym)
+            val header = ExportHeader(st.settings.organization, st.settings.employee)
+            val (bytes, rep) = DocxExporter.export(template, summary, header)
             val dir = File(ctx.cacheDir, "exports").apply { mkdirs() }
             dir.listFiles()?.forEach { it.delete() }
-            val f = File(dir, rep.fileName)
-            f.writeBytes(bytes)
+            val f = if (pdf) {
+                File(dir, FormPainter.fileName(ym)).also { out -> out.outputStream().use { PdfExporter.write(summary, header, it) } }
+            } else {
+                File(dir, rep.fileName).also { it.writeBytes(bytes) }
+            }
             f to rep
         }
         val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", file)
@@ -368,7 +390,83 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             email = AppPrefs.reportEmail(ctx),
             subject = "Docházka $monthName ${ym.year} – ${st.settings.employee}",
             body = "Dobrý den,\n\nv příloze posílám docházku za $monthName ${ym.year}. Odpracováno celkem $total h.$extra\n\n${st.settings.employee}",
+            mime = if (pdf) PDF_MIME else DOCX_MIME,
         )
+    }
+
+    fun exportPdf(uri: Uri, ym: YearMonth) = launchSafe {
+        val st = state.value
+        val summary = st.month(ym)
+        withContext(Dispatchers.IO) {
+            val out = ctx.contentResolver.openOutputStream(uri, "wt") ?: throw IOException("Soubor nelze otevřít pro zápis.")
+            out.use { PdfExporter.write(summary, ExportHeader(st.settings.organization, st.settings.employee), it) }
+        }
+        message.value = "PDF uloženo (${FormPainter.fileName(ym)}), celkem ${WorkCalc.formatHm(summary.totalMinutes)} h."
+    }
+
+    // --- aktualizace ------------------------------------------------------------------------
+
+    fun checkUpdate() = launchSafe {
+        update.value = UpdateState.Checking
+        update.value = try {
+            val rel = Updater.latest()
+            when {
+                rel == null -> UpdateState.Failed("Na GitHubu není žádné vydání s APK.")
+                rel.build > Updater.installedBuild(ctx) -> UpdateState.Available(rel)
+                else -> UpdateState.UpToDate(Updater.installedBuild(ctx))
+            }.also { if (rel != null) AppPrefs.setLatestKnownBuild(ctx, rel.build) }
+        } catch (e: Exception) {
+            UpdateState.Failed("Kontrola se nepodařila: ${e.message ?: "bez připojení k internetu?"}")
+        }
+    }
+
+    fun downloadUpdate(rel: cz.kutil.dochazka.update.ReleaseInfo) = launchSafe {
+        update.value = UpdateState.Downloading(rel, 0f)
+        update.value = try {
+            val file = Updater.download(ctx, rel) { p -> update.value = UpdateState.Downloading(rel, p) }
+            UpdateState.Ready(rel, file)
+        } catch (e: Exception) {
+            UpdateState.Failed(e.message ?: "Stažení se nepodařilo.")
+        }
+        (update.value as? UpdateState.Ready)?.let { installUpdate(it.file) }
+    }
+
+    fun installUpdate(file: File) {
+        if (!Updater.canInstall(ctx)) {
+            message.value = "Povol aplikaci „Instalovat neznámé aplikace“ a pak klepni na Nainstalovat znovu."
+            Updater.openInstallPermission(ctx)
+            return
+        }
+        Updater.install(ctx, file)
+    }
+
+    fun setAutoUpdateCheck(on: Boolean) = AppPrefs.setAutoUpdateCheck(ctx, on)
+
+    // --- automatická záloha -------------------------------------------------------------------
+
+    val autoBackupInfo = MutableStateFlow(0)
+
+    fun setAutoBackupFolder(tree: Uri?) = launchSafe {
+        AutoBackup.setFolder(ctx, tree)
+        if (tree != null) {
+            val name = withContext(Dispatchers.IO) { AutoBackup.runNow(ctx) }
+            message.value = "Automatická záloha zapnuta. První záloha: $name"
+        } else {
+            message.value = "Automatická záloha vypnuta."
+        }
+        autoBackupInfo.value++
+    }
+
+    fun runAutoBackupNow() = launchSafe {
+        try {
+            val name = withContext(Dispatchers.IO) { AutoBackup.runNow(ctx) }
+            message.value = "Záloha uložena: $name"
+        } catch (e: Exception) {
+            AppPrefs.setAutoBackupResult(ctx, System.currentTimeMillis(), e.message ?: "Záloha se nepodařila.")
+            throw e
+        } finally {
+            autoBackupInfo.value++
+        }
     }
 
     fun backup(uri: Uri) = launchSafe {

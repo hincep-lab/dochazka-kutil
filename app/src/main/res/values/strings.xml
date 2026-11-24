@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Docházka Kutil</string>
+    <string name="widget_description">Stav práce, dnešní hodiny a tlačítko Začít / Ukončit práci</string>
+    <string name="tile_label">Docházka</string>
 </resources>

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -36,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cz.kutil.dochazka.core.PRAGUE
 import kotlin.math.roundToInt
 import cz.kutil.dochazka.data.AppPrefs
+import cz.kutil.dochazka.data.AutoBackup
 import java.time.LocalDate
 
 @Composable
@@ -51,6 +53,10 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
     var longShiftHours by remember { mutableIntStateOf(AppPrefs.longShiftHours(context)) }
     var backupReminder by remember { mutableStateOf(AppPrefs.backupReminder(context)) }
     var statusNotif by remember { mutableStateOf(AppPrefs.statusNotification(context)) }
+    var autoUpdate by remember { mutableStateOf(AppPrefs.autoUpdateCheck(context)) }
+    val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) vm.setAutoBackupFolder(uri)
+    }
     val lastMessage by vm.message.collectAsStateWithLifecycle()
     val lastBackup = remember(lastMessage, restorePreview) { AppPrefs.lastBackupAt(context) }
     val versionName = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "" }
@@ -162,6 +168,82 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
                 AppPrefs.setReportEmail(context, email)
                 vm.message.value = "E-mail uložen."
             }) { Text("Uložit e-mail") }
+        }
+
+        if (!state.demo) {
+            SectionCard("Aktualizace aplikace") {
+                val upd by vm.update.collectAsStateWithLifecycle()
+                Text("Nainstalováno: verze $versionName", fontWeight = FontWeight.Bold)
+                when (val u = upd) {
+                    UpdateState.Idle -> Unit
+                    UpdateState.Checking -> Text("Zjišťuji…")
+                    is UpdateState.UpToDate -> Text("Máš nejnovější verzi.", color = OkGreen)
+                    is UpdateState.Available -> {
+                        Text("Je k dispozici sestavení ${u.release.build} (${u.release.size / 1_048_576} MB).", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Button(onClick = { vm.downloadUpdate(u.release) }, modifier = Modifier.fillMaxWidth()) { Text("Stáhnout a nainstalovat") }
+                    }
+                    is UpdateState.Downloading -> {
+                        Text("Stahuji sestavení ${u.release.build}…")
+                        if (u.progress >= 0f) LinearProgressIndicator(progress = { u.progress }, modifier = Modifier.fillMaxWidth())
+                        else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                    is UpdateState.Ready -> {
+                        Text("Staženo a ověřeno (otisk souhlasí). Potvrď instalaci v systémovém okně.")
+                        Button(onClick = { vm.installUpdate(u.file) }, modifier = Modifier.fillMaxWidth()) { Text("Nainstalovat") }
+                    }
+                    is UpdateState.Failed -> Text(u.message, color = MaterialTheme.colorScheme.error)
+                }
+                OutlinedButton(onClick = { vm.checkUpdate() }, modifier = Modifier.fillMaxWidth()) { Text("Zkontrolovat aktualizace") }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Jednou denně zkontrolovat a dát vědět", Modifier.weight(1f))
+                    Switch(checked = autoUpdate, onCheckedChange = {
+                        autoUpdate = it
+                        vm.setAutoUpdateCheck(it)
+                    })
+                }
+                Text(
+                    "Aktualizace se stahují z GitHubu (hincep-lab/dochazka-kutil). Stažený soubor se ověří otiskem a Android navíc ověří podpis. " +
+                        "Napoprvé Android požádá o povolení „Instalovat neznámé aplikace“ pro Docházku. Data zůstávají.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            SectionCard("Automatická záloha") {
+                val autoTick by vm.autoBackupInfo.collectAsStateWithLifecycle()
+                val folderName = remember(autoTick) { AutoBackup.folderName(context) }
+                val result = remember(autoTick) { AppPrefs.autoBackupResult(context) }
+                if (folderName == null) {
+                    Text("Vypnutá. Vyber složku a aplikace do ní bude jednou týdně sama ukládat zálohu.")
+                    Button(onClick = { folderLauncher.launch(null) }, modifier = Modifier.fillMaxWidth()) { Text("Vybrat složku a zapnout") }
+                } else {
+                    Text("Složka: $folderName", fontWeight = FontWeight.Bold)
+                    when {
+                        result.second.isNotBlank() -> Text("Poslední pokus ${Fmt.dateTime(result.first)} selhal: ${result.second}", color = MaterialTheme.colorScheme.error)
+                        result.first > 0 -> Text("Poslední automatická záloha: ${Fmt.dateTime(result.first)}", color = OkGreen)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { vm.runAutoBackupNow() }) { Text("Zálohovat teď") }
+                        OutlinedButton(onClick = { folderLauncher.launch(null) }) { Text("Jiná složka") }
+                    }
+                    TextButton(onClick = { vm.setAutoBackupFolder(null) }) { Text("Vypnout automatickou zálohu") }
+                }
+                Text(
+                    "Soubory Dochazka_auto_RRRR-MM-DD.json, ponechá se posledních ${AutoBackup.KEEP} (starší automatické se smažou, jiné soubory ve složce zůstávají). " +
+                        "Nejlépe vyber složku v telefonu, např. Dokumenty – cloudové složky Android často nepovolí.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            SectionCard("Widget a rychlé nastavení") {
+                Text(
+                    "Widget: podrž prst na ploše → Widgety → Docházka Kutil. Ukazuje stav, dnešní a měsíční hodiny a tlačítko Začít / Ukončit práci.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    "Dlaždice: stáhni lištu dvakrát dolů → tužka (Upravit) → přetáhni dlaždici Docházka mezi aktivní. Klepnutím začneš nebo ukončíš práci; na zamčeném telefonu se nejdřív odemkne.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
 
         SectionCard("Záloha a obnova") {

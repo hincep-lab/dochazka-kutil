@@ -285,4 +285,25 @@ class DatabaseTests {
         assertEquals(at(12, 6, 30), stored.adjustedAt)
         assertEquals("YES", stored.status)
     }
+
+    // ------------------------------------------------------------------------------------
+    // Aktualizace: rozbor odpovědi GitHub API
+    // ------------------------------------------------------------------------------------
+
+    @Test fun rozborVydaniZGitHubu() {
+        val json = """
+            {"tag_name":"build-20","name":"Docházka Kutil – verze 9 (sestavení 20)","assets":[
+              {"name":"DochazkaKutil-v9-20.apk","size":25700000,"digest":"sha256:ABCDEF0123",
+               "browser_download_url":"https://github.com/hincep-lab/dochazka-kutil/releases/download/build-20/DochazkaKutil-v9-20.apk"}]}
+        """.trimIndent()
+        val r = cz.kutil.dochazka.update.Updater.parse(json)!!
+        assertEquals(20, r.build)
+        assertEquals("9", r.version)
+        assertEquals("ABCDEF0123", r.sha256)
+        assertEquals(25700000L, r.size)
+        assertTrue(r.apkUrl.endsWith("DochazkaKutil-v9-20.apk"))
+        // starší pojmenování APK nebo vydání bez APK → nic k instalaci
+        assertNull(cz.kutil.dochazka.update.Updater.parse("""{"assets":[{"name":"DochazkaKutil-7.apk","browser_download_url":"x"}]}"""))
+        assertNull(cz.kutil.dochazka.update.Updater.parse("""{"assets":[]}"""))
+    }
 }

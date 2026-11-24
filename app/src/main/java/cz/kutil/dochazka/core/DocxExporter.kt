@@ -43,7 +43,7 @@ object DocxExporter {
         "leden", "únor", "březen", "duben", "květen", "červen",
         "červenec", "srpen", "září", "říjen", "listopad", "prosinec",
     )
-    private val WEEKDAYS = mapOf(
+    val WEEKDAYS = mapOf(
         DayOfWeek.MONDAY to "pondělí", DayOfWeek.TUESDAY to "úterý", DayOfWeek.WEDNESDAY to "středa",
         DayOfWeek.THURSDAY to "čtvrtek", DayOfWeek.FRIDAY to "pátek", DayOfWeek.SATURDAY to "sobota",
         DayOfWeek.SUNDAY to "neděle",
@@ -339,7 +339,7 @@ object DocxExporter {
         return "<w:b w:val=\"1\"/><w:i w:val=\"1\"/><w:sz w:val=\"$size\"/><w:szCs w:val=\"$size\"/>"
     }
 
-    private fun buildLabelNote(month: MonthSummary): String {
+    fun buildLabelNote(month: MonthSummary): String {
         val m = month.month.monthValue
         fun dates(days: List<DaySummary>) = days.joinToString(", ") { "${it.date.dayOfMonth}." } + " $m."
         val parts = ArrayList<String>()

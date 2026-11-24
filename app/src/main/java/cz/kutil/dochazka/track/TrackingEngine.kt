@@ -196,6 +196,9 @@ object TrackingEngine {
     /** Zobrazí nebo skryje trvalé oznámení „V práci od …“ podle skutečné otevřené směny v databázi. */
     suspend fun refreshStatus(ctx: Context) {
         val app = ctx.applicationContext
+        // Widget na ploše a dlaždice v rychlém nastavení ukazují totéž.
+        runCatching { cz.kutil.dochazka.widget.DochazkaWidget.updateAll(app) }
+        cz.kutil.dochazka.widget.DochazkaTile.requestRefresh(app)
         val dao = Graph.realDb(app).dao()
         val open = dao.openShift()
         if (open == null || !AppPrefs.statusNotification(app)) {

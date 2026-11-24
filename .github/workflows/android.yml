@@ -40,6 +40,35 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk "out/DochazkaKutil-v${V}-${{ github.run_number }}.apk"
           ls -la out
 
+      - name: Podpis novým klíčem (rotace z veřejného klíče)
+        # Starý klíč v keystore/ je veřejný (repozitář je veřejný). Pokud je v GitHub Secrets nový
+        # soukromý klíč, APK se podepíše oběma s rotací podpisu (APK Signature Scheme v3): telefon
+        # s dosavadní verzí přijme aktualizaci a od té chvíle věří jen novému klíči.
+        env:
+          RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          if [ -z "$RELEASE_KEYSTORE_B64" ] || [ -z "$RELEASE_KEY_PASSWORD" ]; then
+            echo "::warning::Nový podpisový klíč není v GitHub Secrets – APK zůstává podepsané starým (veřejným) klíčem."
+            exit 0
+          fi
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          echo "build-tools: $BT"
+          echo "$RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          APK=$(ls out/*.apk)
+          "$BT/apksigner" rotate --out "$RUNNER_TEMP/lineage.bin" \
+            --old-signer --ks keystore/debug.keystore --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android \
+            --new-signer --ks "$RUNNER_TEMP/release.jks" --ks-pass env:RELEASE_KEY_PASSWORD --ks-key-alias dochazka --key-pass env:RELEASE_KEY_PASSWORD
+          "$BT/apksigner" sign \
+            --ks keystore/debug.keystore --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android \
+            --next-signer --ks "$RUNNER_TEMP/release.jks" --ks-pass env:RELEASE_KEY_PASSWORD --ks-key-alias dochazka --key-pass env:RELEASE_KEY_PASSWORD \
+            --lineage "$RUNNER_TEMP/lineage.bin" \
+            --out "$APK.signed" "$APK"
+          mv "$APK.signed" "$APK"
+          rm -f "$APK.signed.idsig" "$APK.idsig"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | grep -E "Verified using|Signer|certificate SHA-256" || true
+          rm -f "$RUNNER_TEMP/release.jks"
+
       - name: Výsledky testů
         if: always()
         uses: actions/upload-artifact@v4

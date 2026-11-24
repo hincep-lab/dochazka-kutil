@@ -30,6 +30,14 @@ object AppPrefs {
     fun backupReminder(ctx: Context): Boolean = prefs(ctx).getBoolean("backup_reminder", true)
     fun setBackupReminder(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("backup_reminder", on).apply()
 
+    /** Denní kontrola nové verze na GitHubu. */
+    fun autoUpdateCheck(ctx: Context): Boolean = prefs(ctx).getBoolean("auto_update_check", true)
+    fun setAutoUpdateCheck(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("auto_update_check", on).apply()
+
+    /** Složka (SAF strom) pro automatickou týdenní zálohu; null = vypnuto. */
+    fun autoBackupFolder(ctx: Context): String? = prefs(ctx).getString("auto_backup_folder", null)
+    fun setAutoBackupFolder(ctx: Context, uri: String?) = prefs(ctx).edit().putString("auto_backup_folder", uri).apply()
+
     // --- provozní údaje ----------------------------------------------------------------------
     /** Měsíc (yyyy-MM), za který už přišlo připomenutí uzávěrky. */
     fun lastReminded(ctx: Context): String = prefs(ctx).getString("last_reminded_month", "") ?: ""
@@ -37,6 +45,17 @@ object AppPrefs {
 
     fun lastBackupReminded(ctx: Context): String = prefs(ctx).getString("last_backup_reminded", "") ?: ""
     fun setLastBackupReminded(ctx: Context, month: String) = prefs(ctx).edit().putString("last_backup_reminded", month).apply()
+
+    fun latestKnownBuild(ctx: Context): Int = prefs(ctx).getInt("latest_known_build", 0)
+    fun setLatestKnownBuild(ctx: Context, build: Int) = prefs(ctx).edit().putInt("latest_known_build", build).apply()
+    fun lastUpdateNotified(ctx: Context): Int = prefs(ctx).getInt("last_update_notified", 0)
+    fun setLastUpdateNotified(ctx: Context, build: Int) = prefs(ctx).edit().putInt("last_update_notified", build).apply()
+
+    /** Výsledek poslední automatické zálohy: čas a chyba (prázdná = v pořádku). */
+    fun autoBackupResult(ctx: Context): Pair<Long, String> =
+        prefs(ctx).getLong("auto_backup_at", 0) to (prefs(ctx).getString("auto_backup_err", "") ?: "")
+    fun setAutoBackupResult(ctx: Context, at: Long, error: String) =
+        prefs(ctx).edit().putLong("auto_backup_at", at).putString("auto_backup_err", error).apply()
 
     fun lastBackupAt(ctx: Context): Long = prefs(ctx).getLong("last_backup_at", 0)
     fun setLastBackupAt(ctx: Context, at: Long) = prefs(ctx).edit().putLong("last_backup_at", at).apply()
@@ -77,11 +96,13 @@ object AppPrefs {
         .put("longShiftHours", longShiftHours(ctx))
         .put("backupReminder", backupReminder(ctx))
         .put("statusNotification", statusNotification(ctx))
+        .put("autoUpdateCheck", autoUpdateCheck(ctx))
 
     fun fromJson(ctx: Context, json: JSONObject) {
         if (json.has("monthlyReminder")) setReminderEnabled(ctx, json.optBoolean("monthlyReminder", true))
         if (json.has("reportEmail")) setReportEmail(ctx, json.optString("reportEmail", ""))
         if (json.has("longShiftHours")) setLongShiftHours(ctx, json.optInt("longShiftHours", 12))
+        if (json.has("autoUpdateCheck")) setAutoUpdateCheck(ctx, json.optBoolean("autoUpdateCheck", true))
         if (json.has("statusNotification")) setStatusNotification(ctx, json.optBoolean("statusNotification", true))
         if (json.has("backupReminder")) setBackupReminder(ctx, json.optBoolean("backupReminder", true))
     }

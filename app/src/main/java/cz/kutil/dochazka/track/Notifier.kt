@@ -70,6 +70,25 @@ object Notifier {
         notifySafe(ctx, STATUS_ID, builder)
     }
 
+    /** Je k dispozici novější verze aplikace. Klepnutí otevře Nastavení → Aktualizace. */
+    fun showUpdate(ctx: Context, build: Int): Boolean {
+        if (!canNotify(ctx)) return false
+        ensureChannel(ctx)
+        val open = PendingIntent.getActivity(
+            ctx, 506,
+            Intent(ctx, MainActivity::class.java).putExtra(EXTRA_OPEN_TAB, "settings")
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val builder = NotificationCompat.Builder(ctx, CHANNEL_MONTHLY)
+            .setSmallIcon(R.drawable.ic_notif)
+            .setContentTitle("Nová verze Docházky")
+            .setContentText("Je k dispozici sestavení $build. Klepni a v Nastavení dej Stáhnout a nainstalovat.")
+            .setAutoCancel(true)
+            .setContentIntent(open)
+        return notifySafe(ctx, 506, builder)
+    }
+
     fun cancelWorking(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(STATUS_ID)
     private const val DONE_ID = 504
     const val ACTION_END_AT = "cz.kutil.dochazka.END_AT"
