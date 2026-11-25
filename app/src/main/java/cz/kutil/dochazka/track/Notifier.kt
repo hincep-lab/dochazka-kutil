@@ -90,7 +90,8 @@ object Notifier {
             .setContentText("Je k dispozici sestavení $build. Klepni a v Nastavení dej Stáhnout a nainstalovat.")
             .setAutoCancel(true)
             .setContentIntent(open)
-        return notifySafe(ctx, 506, builder)
+        val fresh = !isActive(ctx, 506)
+        return notifySafe(ctx, 506, builder).also { if (it && fresh) NotifyVoice.say(ctx, NotifyVoice.Line.UPDATE) }
     }
 
     fun cancelWorking(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(STATUS_ID)
@@ -124,8 +125,16 @@ object Notifier {
             .setAutoCancel(true)
             .setTimeoutAfter(15_000)
             .setContentIntent(open)
-        notifySafe(ctx, DONE_ID, builder)
+        if (notifySafe(ctx, DONE_ID, builder)) when (title) {
+            "Začátek práce zapsán" -> NotifyVoice.say(ctx, NotifyVoice.Line.STARTED, 150)
+            "Konec práce zapsán" -> NotifyVoice.say(ctx, NotifyVoice.Line.ENDED, 150)
+        }
     }
+
+    /** Je oznámení s tímto id už zobrazené? (pak se při obnovení znovu nemluví) */
+    private fun isActive(ctx: Context, id: Int): Boolean = runCatching {
+        (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager).activeNotifications.any { it.id == id }
+    }.getOrDefault(false)
 
     private val TIME = DateTimeFormatter.ofPattern("H:mm")
     private val DAY = DateTimeFormatter.ofPattern("d. M.")
@@ -171,7 +180,9 @@ object Notifier {
             .setAutoCancel(true)
             .setContentIntent(open)
         return try {
+            val fresh = !isActive(ctx, MONTHLY_ID)
             NotificationManagerCompat.from(ctx).notify(MONTHLY_ID, builder.build())
+            if (fresh) NotifyVoice.say(ctx, NotifyVoice.Line.MONTHLY)
             true
         } catch (e: SecurityException) {
             false
@@ -246,7 +257,13 @@ object Notifier {
             builder.addAction(quickAction(if (yes) "ANO" else "NE", pi))
         }
         try {
+            val fresh = !isActive(ctx, notificationId(p.id))
             NotificationManagerCompat.from(ctx).notify(notificationId(p.id), builder.build())
+            if (fresh) NotifyVoice.say(ctx, when {
+                p.type == "END" -> NotifyVoice.Line.END
+                p.pairedEndAt != null -> NotifyVoice.Line.TRIP
+                else -> NotifyVoice.Line.START
+            })
         } catch (e: SecurityException) {
             // Oprávnění bylo mezitím odebráno – návrh zůstává viditelný v aplikaci.
         }
@@ -302,7 +319,8 @@ object Notifier {
         if (returnAtMs != null) builder.addAction(quickAction("Konec v ${time(returnAtMs)}", endAt(1, returnAtMs)))
         builder.addAction(quickAction("Konec teď", endAt(2, null)))
         builder.addAction(quickAction("Stále pracuji", still))
-        return notifySafe(ctx, LONG_SHIFT_ID, builder)
+        val fresh = !isActive(ctx, LONG_SHIFT_ID)
+        return notifySafe(ctx, LONG_SHIFT_ID, builder).also { if (it && fresh) NotifyVoice.say(ctx, NotifyVoice.Line.LONG_SHIFT) }
     }
 
     fun cancelLongShift(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(LONG_SHIFT_ID)
@@ -325,7 +343,8 @@ object Notifier {
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)
             .setContentIntent(open)
-        return notifySafe(ctx, BACKUP_ID, builder)
+        val fresh = !isActive(ctx, BACKUP_ID)
+        return notifySafe(ctx, BACKUP_ID, builder).also { if (it && fresh) NotifyVoice.say(ctx, NotifyVoice.Line.BACKUP) }
     }
 
     /** Zkušební dotaz – ověří oznámení (i na hodinkách), do docházky nic nezapisuje. */
@@ -345,7 +364,8 @@ object Notifier {
             val pi = PendingIntent.getBroadcast(ctx, TEST_ID * 2 + (if (yes) 1 else 0), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             builder.addAction(quickAction(if (yes) "ANO" else "NE", pi))
         }
-        return notifySafe(ctx, TEST_ID, builder)
+        val fresh = !isActive(ctx, TEST_ID)
+        return notifySafe(ctx, TEST_ID, builder).also { if (it && fresh) NotifyVoice.say(ctx, NotifyVoice.Line.TEST) }
     }
 
     fun cancelTest(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(TEST_ID)

@@ -28,6 +28,10 @@ object AppPrefs {
     fun decorAnimations(ctx: Context): Boolean = prefs(ctx).getBoolean("decor_animations", true)
     fun setDecorAnimations(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("decor_animations", on).apply()
 
+    /** Mluvící oznámení: Kutil řekne nahlas, co se děje (jen v normálním režimu zvonění, 6–22 h). */
+    fun talkingNotifications(ctx: Context): Boolean = prefs(ctx).getBoolean("talking_notifications", true)
+    fun setTalkingNotifications(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("talking_notifications", on).apply()
+
     /** Plynulost animací v aplikaci: 60 nebo 120 snímků za sekundu (120 = plná frekvence displeje). */
     fun smoothFps(ctx: Context): Int = if (prefs(ctx).getInt("smooth_fps", 60) >= 120) 120 else 60
     fun setSmoothFps(ctx: Context, fps: Int) = prefs(ctx).edit().putInt("smooth_fps", if (fps >= 120) 120 else 60).apply()

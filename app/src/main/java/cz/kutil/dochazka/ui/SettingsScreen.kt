@@ -158,6 +158,24 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
                 "Tiché ťuknutí kapky a v přesčasu šumění přetékající vody. Hraje jen při otevřené aplikaci a nikdy v tichém režimu ani na vibracích.",
                 style = MaterialTheme.typography.bodySmall,
             )
+            var talk by remember { mutableStateOf(AppPrefs.talkingNotifications(context)) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Mluvící oznámení", Modifier.weight(1f))
+                Switch(checked = talk, onCheckedChange = {
+                    talk = it
+                    AppPrefs.setTalkingNotifications(context, it)
+                })
+            }
+            Text(
+                "Kutil řekne nahlas, co oznámení chce (dotaz na začátek či konec práce, zapomenutá směna, uzávěrka…). " +
+                    "Mluví jen v normálním režimu zvonění, ne v tichém, na vibracích, v režimu Nerušit ani v noci od 22 do 6 hodin.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (talk) {
+                androidx.compose.material3.TextButton(onClick = {
+                    cz.kutil.dochazka.track.NotifyVoice.say(context, cz.kutil.dochazka.track.NotifyVoice.Line.START, 0)
+                }) { Text("Poslechnout ukázku") }
+            }
             var gag by remember { mutableStateOf(AppPrefs.plumberGag(context)) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Instalatér Kutil (vtipná scénka)", Modifier.weight(1f))
