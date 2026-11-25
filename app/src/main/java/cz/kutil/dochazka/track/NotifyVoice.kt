@@ -21,6 +21,7 @@ object NotifyVoice {
         START(R.raw.notif_start), END(R.raw.notif_end), TRIP(R.raw.notif_trip), LONG_SHIFT(R.raw.notif_long),
         MONTHLY(R.raw.notif_month), BACKUP(R.raw.notif_backup), UPDATE(R.raw.notif_update),
         STARTED(R.raw.notif_started), ENDED(R.raw.notif_ended), TEST(R.raw.notif_test),
+        BACKUP_OK(R.raw.notif_backup_ok), BACKUP_FAIL(R.raw.notif_backup_fail),
     }
 
     private var player: MediaPlayer? = null

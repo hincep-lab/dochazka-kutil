@@ -1,5 +1,7 @@
 package cz.kutil.dochazka.track
 
+import cz.kutil.dochazka.data.AppPrefs
+
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -31,6 +33,9 @@ object Notifier {
     /** Oranžová firemní barva (ikona a tlačítka oznámení). */
     private const val ACCENT = 0xFFF59E1B.toInt()
     const val CHANNEL_STATUS = "work_status"
+    const val CHANNEL_BACKUP = "backups"
+    const val BACKUP_DONE_ID = 507
+    const val BACKUP_FAIL_ID = 508
     private const val STATUS_ID = 505
 
     /**
@@ -155,6 +160,57 @@ object Notifier {
         status.description = "Trvalé oznámení „V práci od …“, dokud běží směna."
         status.lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
         nm.createNotificationChannel(status)
+        val backups = NotificationChannel(CHANNEL_BACKUP, "Zálohy", NotificationManager.IMPORTANCE_LOW)
+        backups.description = "Potvrzení „Záloha provedena“ po každé uložené záloze."
+        nm.createNotificationChannel(backups)
+    }
+
+    /** „Záloha provedena“ – potvrzení po uložené záloze (tiché oznámení, Kutil to řekne přes den). */
+    fun showBackupDone(ctx: Context, atMs: Long, where: String?): Boolean {
+        if (!AppPrefs.backupNotices(ctx) || !canNotify(ctx)) return false
+        ensureChannel(ctx)
+        NotificationManagerCompat.from(ctx).cancel(BACKUP_FAIL_ID)
+        NotificationManagerCompat.from(ctx).cancel(BACKUP_ID)
+        val open = PendingIntent.getActivity(
+            ctx, BACKUP_DONE_ID,
+            Intent(ctx, MainActivity::class.java).putExtra(EXTRA_OPEN_TAB, "settings")
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val text = "Uloženo ${day(atMs)} v ${time(atMs)}" + (where?.let { " do složky $it" } ?: "") + ". Data jsou v bezpečí."
+        val builder = NotificationCompat.Builder(ctx, CHANNEL_BACKUP)
+            .setSmallIcon(R.drawable.ic_notif)
+            .setContentTitle("Záloha provedena ✓")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setColor(0xFF22C493.toInt())
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setAutoCancel(true)
+            .setContentIntent(open)
+        return notifySafe(ctx, BACKUP_DONE_ID, builder).also { if (it) NotifyVoice.say(ctx, NotifyVoice.Line.BACKUP_OK, 200) }
+    }
+
+    /** Záloha selhala – ozve se hned, ať se to dá opravit (např. znovu vybrat složku). */
+    fun showBackupFailed(ctx: Context, reason: String): Boolean {
+        if (!AppPrefs.backupNotices(ctx) || !canNotify(ctx)) return false
+        ensureChannel(ctx)
+        val open = PendingIntent.getActivity(
+            ctx, BACKUP_FAIL_ID,
+            Intent(ctx, MainActivity::class.java).putExtra(EXTRA_OPEN_TAB, "settings")
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val text = "$reason Klepni a v Nastavení zálohu zopakuj nebo vyber složku znovu."
+        val builder = NotificationCompat.Builder(ctx, CHANNEL_MONTHLY)
+            .setSmallIcon(R.drawable.ic_notif)
+            .setContentTitle("Záloha se nepovedla")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setColor(0xFFFF7A45.toInt())
+            .setAutoCancel(true)
+            .setContentIntent(open)
+        val fresh = !isActive(ctx, BACKUP_FAIL_ID)
+        return notifySafe(ctx, BACKUP_FAIL_ID, builder).also { if (it && fresh) NotifyVoice.say(ctx, NotifyVoice.Line.BACKUP_FAIL) }
     }
 
     /** Připomenutí měsíční uzávěrky. Vrací false, pokud oznámení nejde zobrazit. */
@@ -334,11 +390,13 @@ object Notifier {
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val text = (if (lastBackupMs > 0) "Poslední záloha: ${day(lastBackupMs)}" else "Docházka ještě nebyla zálohována") +
-            ". Klepni a ulož si zálohu, ať o data nepřijdeš při ztrátě telefonu."
+        val days = if (lastBackupMs > 0) ((System.currentTimeMillis() - lastBackupMs) / 86_400_000L) else -1
+        val folderSet = cz.kutil.dochazka.data.AutoBackup.folder(ctx) != null
+        val text = (if (days >= 0) "Poslední záloha ${day(lastBackupMs)} (před $days ${when (days) { 1L -> "dnem"; else -> "dny" }})" else "Docházka ještě nebyla zálohována") +
+            (if (folderSet) ". Automatická záloha se neprovádí – klepni a spusť ji ručně." else ". Klepni a vyber složku pro automatickou zálohu, pak se bude zálohovat každý den sama.")
         val builder = NotificationCompat.Builder(ctx, CHANNEL_MONTHLY)
             .setSmallIcon(R.drawable.ic_notif)
-            .setContentTitle("Zálohuj docházku")
+            .setContentTitle("Hlídám zálohy: zálohuj docházku")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)

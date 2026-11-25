@@ -114,10 +114,15 @@ class AutoBackupWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
         val app = applicationContext
         if (AutoBackup.folder(app) == null) return Result.success()
         return try {
-            AutoBackup.runNow(app, force = false)
+            // nový soubor = záloha provedena (když se nic nezměnilo, nic se nehlásí)
+            if (AutoBackup.runNow(app, force = false) != null) {
+                cz.kutil.dochazka.track.Notifier.showBackupDone(app, System.currentTimeMillis(), AutoBackup.folderName(app))
+            }
             Result.success()
         } catch (e: Exception) {
-            AppPrefs.setAutoBackupResult(app, System.currentTimeMillis(), e.message ?: "Záloha se nepodařila.")
+            val msg = e.message ?: "Záloha se nepodařila."
+            AppPrefs.setAutoBackupResult(app, System.currentTimeMillis(), msg)
+            cz.kutil.dochazka.track.Notifier.showBackupFailed(app, msg)
             Result.success()
         }
     }

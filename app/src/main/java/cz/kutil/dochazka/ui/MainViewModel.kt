@@ -460,7 +460,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun runAutoBackupNow() = launchSafe {
         try {
             val name = withContext(Dispatchers.IO) { AutoBackup.runNow(ctx) }
-            message.value = "Záloha uložena: $name"
+            message.value = "Záloha provedena: $name"
+            cz.kutil.dochazka.track.Notifier.showBackupDone(ctx, System.currentTimeMillis(), AutoBackup.folderName(ctx))
         } catch (e: Exception) {
             AppPrefs.setAutoBackupResult(ctx, System.currentTimeMillis(), e.message ?: "Záloha se nepodařila.")
             throw e
@@ -479,8 +480,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (check == null) throw IOException("Zálohu se nepodařilo po uložení ověřit.")
             Backup.inspect(check)
         }
-        if (!demo) AppPrefs.setLastBackupAt(ctx, System.currentTimeMillis())
-        message.value = "Záloha uložena a ověřena."
+        if (!demo) {
+            AppPrefs.setLastBackupAt(ctx, System.currentTimeMillis())
+            cz.kutil.dochazka.track.Notifier.showBackupDone(ctx, System.currentTimeMillis(), null)
+        }
+        message.value = "Záloha provedena a ověřena."
     }
 
     private suspend fun readText(uri: Uri): String = withContext(Dispatchers.IO) {

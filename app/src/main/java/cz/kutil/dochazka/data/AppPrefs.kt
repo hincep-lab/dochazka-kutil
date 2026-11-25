@@ -47,6 +47,10 @@ object AppPrefs {
     fun statusNotification(ctx: Context): Boolean = prefs(ctx).getBoolean("status_notification", true)
     fun setStatusNotification(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("status_notification", on).apply()
 
+    /** Hlásit „Záloha provedena“ / „Záloha selhala“ oznámením. */
+    fun backupNotices(ctx: Context): Boolean = prefs(ctx).getBoolean("backup_notices", true)
+    fun setBackupNotices(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("backup_notices", on).apply()
+
     fun backupReminder(ctx: Context): Boolean = prefs(ctx).getBoolean("backup_reminder", true)
     fun setBackupReminder(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("backup_reminder", on).apply()
 

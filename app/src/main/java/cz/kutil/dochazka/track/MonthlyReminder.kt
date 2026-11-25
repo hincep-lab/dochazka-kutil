@@ -45,22 +45,27 @@ class MonthlyReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineW
         return Result.success()
     }
 
-    /** Volitelná měsíční připomínka zálohy: jednou za měsíc, pokud je poslední záloha starší než 25 dní. */
+    /**
+     * Hlídání zálohy: když poslední úspěšná záloha je starší než [STALE_DAYS] dní (a v aplikaci jsou data),
+     * připomene se to – nejvýš jednou denně, mezi 8. a 20. hodinou.
+     */
     private suspend fun backupReminder(ctx: Context, now: ZonedDateTime) {
         if (!AppPrefs.backupReminder(ctx)) return
-        val month = YearMonth.from(now).toString()
-        if (AppPrefs.lastBackupReminded(ctx) == month) return
+        if (now.hour !in 8..19) return
+        val today = now.toLocalDate().toString()
+        if (AppPrefs.lastBackupReminded(ctx) == today) return
         val last = AppPrefs.lastBackupAt(ctx)
-        val fresh = last > 0 && System.currentTimeMillis() - last < 25L * 24 * 3600 * 1000
+        val fresh = last > 0 && System.currentTimeMillis() - last < STALE_DAYS * 24L * 3600 * 1000
+        if (fresh) return
         val hasData = Graph.realDb(ctx).dao().allShifts().isNotEmpty()
-        if (fresh || !hasData) {
-            AppPrefs.setLastBackupReminded(ctx, month)
-            return
-        }
-        if (Notifier.showBackupReminder(ctx, last)) AppPrefs.setLastBackupReminded(ctx, month)
+        if (!hasData) return
+        if (Notifier.showBackupReminder(ctx, last)) AppPrefs.setLastBackupReminded(ctx, today)
     }
 
     companion object {
+        /** Po kolika dnech bez zálohy se Kutil ozve. */
+        const val STALE_DAYS = 3
+
         fun ensureScheduled(ctx: Context) {
             val request = PeriodicWorkRequestBuilder<MonthlyReminderWorker>(4, TimeUnit.HOURS).build()
             WorkManager.getInstance(ctx).enqueueUniquePeriodicWork("monthly_reminder", ExistingPeriodicWorkPolicy.KEEP, request)

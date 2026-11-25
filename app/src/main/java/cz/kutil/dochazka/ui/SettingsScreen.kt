@@ -54,6 +54,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
     val restorePreview by vm.restorePreview.collectAsStateWithLifecycle()
     var longShiftHours by remember { mutableIntStateOf(AppPrefs.longShiftHours(context)) }
     var backupReminder by remember { mutableStateOf(AppPrefs.backupReminder(context)) }
+    var backupNotices by remember { mutableStateOf(AppPrefs.backupNotices(context)) }
     var statusNotif by remember { mutableStateOf(AppPrefs.statusNotification(context)) }
     var autoUpdate by remember { mutableStateOf(AppPrefs.autoUpdateCheck(context)) }
     val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -345,10 +346,17 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
             )
             if (!state.demo) Text(if (lastBackup > 0) "Poslední záloha: ${Fmt.dateTime(lastBackup)}" else "Zatím žádná záloha.", fontWeight = FontWeight.Bold)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Jednou měsíčně připomenout zálohu", Modifier.weight(1f))
+                Text("Hlídat zálohy (ozvu se po ${cz.kutil.dochazka.track.MonthlyReminderWorker.STALE_DAYS} dnech bez zálohy)", Modifier.weight(1f))
                 Switch(checked = backupReminder, onCheckedChange = {
                     backupReminder = it
                     AppPrefs.setBackupReminder(context, it)
+                })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Hlásit „Záloha provedena“", Modifier.weight(1f))
+                Switch(checked = backupNotices, onCheckedChange = {
+                    backupNotices = it
+                    AppPrefs.setBackupNotices(context, it)
                 })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
