@@ -308,6 +308,17 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
                         result.second.isNotBlank() -> Text("Poslední pokus ${Fmt.dateTime(result.first)} selhal: ${result.second}", color = MaterialTheme.colorScheme.error)
                         result.first > 0 -> Text("Poslední automatická záloha: ${Fmt.dateTime(result.first)}", color = OkGreen)
                     }
+                    var backupMin by remember { mutableIntStateOf(AppPrefs.autoBackupMinute(context)) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Zálohovat každý den v ${backupMin / 60}:${(backupMin % 60).toString().padStart(2, '0')}", Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                        OutlinedButton(onClick = {
+                            android.app.TimePickerDialog(context, { _, h, m ->
+                                backupMin = h * 60 + m
+                                AppPrefs.setAutoBackupMinute(context, backupMin)
+                                AutoBackup.ensureScheduled(context, replace = true)
+                            }, backupMin / 60, backupMin % 60, true).show()
+                        }) { Text("Změnit čas") }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { vm.runAutoBackupNow() }) { Text("Zálohovat teď") }
                         OutlinedButton(onClick = { folderLauncher.launch(null) }) { Text("Jiná složka") }
@@ -315,7 +326,7 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
                     TextButton(onClick = { vm.setAutoBackupFolder(null) }) { Text("Vypnout automatickou zálohu") }
                 }
                 Text(
-                    "Jednou denně, jen když se od poslední zálohy něco změnilo. Soubory Dochazka_auto_RRRR-MM-DD.json, ponechá se posledních ${AutoBackup.KEEP} (starší automatické se smažou, jiné soubory ve složce zůstávají). " +
+                    "Jednou denně v nastavený čas (když je telefon vypnutý nebo úsporný režim, proběhne hned jak to půjde), jen když se od poslední zálohy něco změnilo. Soubory Dochazka_auto_RRRR-MM-DD.json, ponechá se posledních ${AutoBackup.KEEP} (starší automatické se smažou, jiné soubory ve složce zůstávají). " +
                         "Nejlépe vyber složku v telefonu, např. Dokumenty – cloudové složky Android často nepovolí.",
                     style = MaterialTheme.typography.bodySmall,
                 )

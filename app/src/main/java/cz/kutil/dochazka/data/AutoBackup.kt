@@ -5,8 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.work.CoroutineWorker
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import cz.kutil.dochazka.core.PRAGUE
@@ -15,7 +15,7 @@ import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
 /**
- * Automatická záloha jednou denně do složky, kterou uživatel jednou vybere (Storage Access Framework).
+ * Automatická záloha jednou denně v nastavený čas (výchozí 18:00) do složky, kterou uživatel jednou vybere (Storage Access Framework).
  * Když se od poslední zálohy nic nezměnilo, nový soubor nevzniká.
  * Soubory se jmenují Dochazka_auto_RRRR-MM-DD.json; ponechá se posledních [KEEP], starší automatické
  * zálohy (jen s tímto názvem) se smažou. Ručně uložené zálohy ani jiné soubory ve složce se nemění.
@@ -102,16 +102,38 @@ object AutoBackup {
         return name
     }
 
-    fun ensureScheduled(ctx: Context) {
-        val request = PeriodicWorkRequestBuilder<AutoBackupWorker>(1, TimeUnit.DAYS).build()
-        // UPDATE: dřívější týdenní plán se přepne na denní, aniž by se ztratil.
-        WorkManager.getInstance(ctx).enqueueUniquePeriodicWork("auto_backup", ExistingPeriodicWorkPolicy.UPDATE, request)
+    /** Jak dlouho zbývá do nejbližšího nastaveného času zálohy (dnes, nebo zítra). */
+    fun delayToNext(ctx: Context, now: java.time.ZonedDateTime = java.time.ZonedDateTime.now(PRAGUE)): Long {
+        val m = AppPrefs.autoBackupMinute(ctx)
+        var next = now.toLocalDate().atTime(m / 60, m % 60).atZone(PRAGUE)
+        if (!next.isAfter(now.plusMinutes(1))) next = next.plusDays(1)
+        return java.time.Duration.between(now, next).toMillis()
+    }
+
+    /**
+     * Záloha každý den v nastavený čas (výchozí 18:00). Plánuje se vždy jen ta příští;
+     * po proběhnutí si worker naplánuje další. [replace] = po změně času v Nastavení.
+     */
+    fun ensureScheduled(ctx: Context, replace: Boolean = false, fromWorker: Boolean = false) {
+        val wm = WorkManager.getInstance(ctx)
+        wm.cancelUniqueWork("auto_backup") // dřívější plán „jednou za 24 h kdykoli“
+        val request = OneTimeWorkRequestBuilder<AutoBackupWorker>()
+            .setInitialDelay(delayToNext(ctx), TimeUnit.MILLISECONDS)
+            .build()
+        val policy = when {
+            fromWorker -> ExistingWorkPolicy.APPEND_OR_REPLACE
+            replace -> ExistingWorkPolicy.REPLACE
+            else -> ExistingWorkPolicy.KEEP
+        }
+        wm.enqueueUniqueWork("auto_backup_daily", policy, request)
     }
 }
 
 class AutoBackupWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
         val app = applicationContext
+        // další záloha zítra ve stejný čas (naplánuje se hned, ať se plán nikdy nepřetrhne)
+        AutoBackup.ensureScheduled(app, fromWorker = true)
         if (AutoBackup.folder(app) == null) return Result.success()
         return try {
             // nový soubor = záloha provedena (když se nic nezměnilo, nic se nehlásí)

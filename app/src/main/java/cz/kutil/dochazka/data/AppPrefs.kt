@@ -47,6 +47,10 @@ object AppPrefs {
     fun statusNotification(ctx: Context): Boolean = prefs(ctx).getBoolean("status_notification", true)
     fun setStatusNotification(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("status_notification", on).apply()
 
+    /** Čas automatické zálohy v minutách od půlnoci (výchozí 18:00). */
+    fun autoBackupMinute(ctx: Context): Int = prefs(ctx).getInt("auto_backup_minute", 18 * 60).coerceIn(0, 24 * 60 - 1)
+    fun setAutoBackupMinute(ctx: Context, m: Int) = prefs(ctx).edit().putInt("auto_backup_minute", m.coerceIn(0, 24 * 60 - 1)).apply()
+
     /** Hlásit „Záloha provedena“ / „Záloha selhala“ oznámením. */
     fun backupNotices(ctx: Context): Boolean = prefs(ctx).getBoolean("backup_notices", true)
     fun setBackupNotices(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("backup_notices", on).apply()
