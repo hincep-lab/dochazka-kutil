@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -322,7 +323,7 @@ private fun DrawScope.drawSpeech(tm: androidx.compose.ui.text.TextMeasurer, text
     val head = Offset(p.x + 4 * u * p.facing, floorY - 74 * u - p.lift + p.sit * 12 * u)
     val bx = (head.x - bw / 2 + 14 * u * p.facing).coerceIn(6 * u, size.width - bw - 6 * u)
     val by = head.y - 34 * u - bh - 3 * u * sin(age * 5f)
-    androidx.compose.ui.graphics.drawscope.scale(pop, pop, pivot = Offset(head.x, by + bh)) {
+    scale(pop, pop, pivot = Offset(head.x, by + bh)) {
         val tail = Path().apply {
             val tx = head.x.coerceIn(bx + 12 * u, bx + bw - 12 * u)
             moveTo(tx - 7 * u, by + bh - 1 * u); lineTo(head.x + 2 * u * p.facing, head.y - 22 * u); lineTo(tx + 6 * u, by + bh - 1 * u); close()
