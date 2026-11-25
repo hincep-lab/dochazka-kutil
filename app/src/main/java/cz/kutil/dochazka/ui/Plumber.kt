@@ -487,7 +487,7 @@ internal fun poseToilet(e: Float, t: Float, tx: Float, w: Float, u: Float): Pose
 // Póza postavičky v čase scénky
 // ---------------------------------------------------------------------------------------------
 
-internal class Pose(
+internal data class Pose(
     val x: Float,
     val facing: Float, // 1 = doprava, -1 = doleva
     val run: Float, // 0..1 intenzita běhu
@@ -517,6 +517,8 @@ internal class Pose(
     val noTool: Boolean = false,
     /** Co má na hlavě: 0 čepici, 1 kbelík (přes celou hlavu). */
     val headgear: Int = 0,
+    /** Kouká přímo na diváka (když na něj ťukneš). */
+    val lookAtYou: Boolean = false,
 )
 
 internal fun poseAt(e: Float, t: Float, crackX: Float, w: Float, u: Float): Pose {
@@ -645,7 +647,14 @@ internal class PoseSmoother {
     private var cur: FloatArray? = null
     private var lastT = 0f
     private var lastE = -10f
-    internal fun smooth(target: Pose, t: Float, e: Float): Pose {
+    /** Dočasná změna pózy (reakce na ťuknutí); plynule se do ní přejde i zpět. */
+    var override: ((Pose) -> Pose)? = null
+    /** Poslední vykreslená póza (kde Kutil právě stojí). */
+    var last: Pose? = null
+        private set
+    internal fun smooth(target0: Pose, t: Float, e: Float): Pose = smooth0(override?.invoke(target0) ?: target0, t, e).also { last = it }
+
+    private fun smooth0(target: Pose, t: Float, e: Float): Pose {
         val v = floatArrayOf(target.x, target.armR, target.armL, target.lean, target.tilt, target.sit, target.capLift, target.capSpin, target.run, target.plungeDy, target.dazed, target.grin, target.lift)
         val c = cur
         if (c == null || e < lastE || e - lastE > 0.5f) {
@@ -663,7 +672,7 @@ internal class PoseSmoother {
         return Pose(
             c[0], target.facing, c[8], target.stride, c[1], c[2], c[3], c[4], c[5], c[6], c[7], target.wet, c[10], c[11],
             target.wink, target.thumb, target.tape, target.eyesClosed, target.plunger, target.plungerOnFace, c[9],
-            c[12], target.carry, target.zzz, target.noTool, target.headgear,
+            c[12], target.carry, target.zzz, target.noTool, target.headgear, target.lookAtYou,
         )
     }
 }
@@ -966,14 +975,20 @@ internal fun DrawScope.drawPlumberHead(c: Offset, p: Pose, u: Float, t: Float) {
             }
             drawOval(Color.White, Offset(eo.x - 2.8f * u, eo.y - 3.6f * u), Size(5.6f * u, 7.2f * u))
             drawOval(Outline, Offset(eo.x - 2.8f * u, eo.y - 3.6f * u), Size(5.6f * u, 7.2f * u), style = Stroke(1.1f * u))
-            val look = if (p.grin < -0.4f) Offset(0.6f * u, 1.2f * u) else Offset(1.1f * u, 0f)
+            val look = when {
+                p.lookAtYou -> Offset(-0.5f * u, 0.5f * u) // zpříma na diváka
+                p.grin < -0.4f -> Offset(0.6f * u, 1.2f * u)
+                else -> Offset(1.1f * u, 0f)
+            }
             drawOval(Color(0xFF3B2A1E), Offset(eo.x - 1.6f * u + look.x, eo.y - 1.9f * u + look.y), Size(3.2f * u, 4 * u))
             drawCircle(Color.White, 0.8f * u, Offset(eo.x - 0.4f * u + look.x, eo.y - 1 * u + look.y))
         }
     }
     // husté obočí
     val browLift = if (p.grin < -0.4f) -1.5f * u else if (p.grin > 0.5f) -1f * u else 0f
-    for ((i, eo) in listOf(eyeL, eyeR).withIndex()) {
+    for ((i, eo0) in listOf(eyeL, eyeR).withIndex()) {
+        // „co po mně chceš?“ – jedno obočí vytažené nahoru, druhé zamračené
+        val eo = if (p.lookAtYou) Offset(eo0.x, eo0.y + if (i == 0) -2.2f * u else 0.9f * u) else eo0
         val br = Path().apply {
             moveTo(eo.x - 3.5f * u, eo.y - 5 * u + browLift + if (i == 0 && p.grin < -0.4f) 1.5f * u else 0f)
             quadraticTo(eo.x, eo.y - 7.5f * u + browLift, eo.x + 3.5f * u, eo.y - 5.5f * u + browLift)

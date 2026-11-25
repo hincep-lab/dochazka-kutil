@@ -190,6 +190,36 @@ class ScreenshotTests {
         }
     }
 
+    /** Ťuknutí na Kutila: zarazí se, podívá se na tebe a v bublině něco utrousí. */
+    @Test
+    @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
+    fun kutilPoke() {
+        shoot("28_tuknuti") {
+            Box(Modifier.fillMaxSize()) {
+                WetBackground()
+                androidx.compose.foundation.layout.Column {
+                    val clock = androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(37.3f) }
+                    for ((a, e, line, streak) in listOf(
+                        listOf(cz.kutil.dochazka.ui.Act.PIPE, 4f, "Co po mně chceš?", 0),
+                        listOf(cz.kutil.dochazka.ui.Act.VALVE, 4f, "Nevidíš, že makám?", 0),
+                        listOf(cz.kutil.dochazka.ui.Act.TV, 3f, "Ruším? Hraje se hokej!", 0),
+                        listOf(cz.kutil.dochazka.ui.Act.SLEEP, 3f, "Chrr… co?! Je noc!", 0),
+                        listOf(cz.kutil.dochazka.ui.Act.WANDER, 5f, "Zase ty?!", 2),
+                    )) {
+                        val poke = cz.kutil.dochazka.ui.KutilPoke().apply {
+                            at.floatValue = 37.0f; this.line = line as String; this.streak = streak as Int
+                        }
+                        cz.kutil.dochazka.ui.PlumberStage(
+                            clock, cz.kutil.dochazka.ui.WaterState(1f, 0f), animate = true, onSound = {},
+                            modifier = Modifier.fillMaxWidth().height(cz.kutil.dochazka.ui.StageHeight),
+                            fixedAct = a as cz.kutil.dochazka.ui.Act, fixedElapsed = e as Float, poke = poke,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     @Config(qualifiers = "w412dp-h1800dp-xxhdpi")
     fun stageLadder() = stage("15_stafle", cz.kutil.dochazka.ui.Act.LADDER, listOf(2f, 5.5f, 8f, 10.2f, 11.8f, 13.4f, 15f, 16.5f, 17f))

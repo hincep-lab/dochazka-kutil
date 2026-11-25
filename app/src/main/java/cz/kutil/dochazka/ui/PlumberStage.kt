@@ -11,6 +11,9 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -131,8 +134,12 @@ fun PlumberStage(
     night: Boolean = false,
     fixedAct: Act? = null,
     fixedElapsed: Float? = null,
+    /** Ťuknutí na Kutila: zarazí se, podívá se na tebe a něco utrousí. */
+    poke: KutilPoke? = null,
 ) {
     val act = remember { mutableIntStateOf(Act.WANDER.ordinal) }
+    val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val stageOrigin = remember { floatArrayOf(0f, 0f) }
     val start = remember { mutableFloatStateOf(-1000f) }
     val variant = remember { mutableIntStateOf(0) }
     val smoother = remember { PoseSmoother() }
@@ -158,10 +165,16 @@ fun PlumberStage(
         wasWorking[0] = true
         val forced = PlumberDebug.forcedOrder?.toMutableList()
         val order = forced ?: SCENES.shuffled().toMutableList()
-        var nextAt = clock.value + 2.5f
+        val firstAt = clock.value + 2.5f
+        var curLen = 0f
+        var gap = 0f
+        var first = true
         var sinceScene = 0
         snapshotFlow { clock.value }.collect { t ->
-            if (t < nextAt) return@collect
+            if (poke?.active(t) == true) return@collect
+            // konec scénky se počítá od jejího začátku (ten se po ťuknutí posune o dobu zastavení)
+            if (t < (if (first) firstAt else start.floatValue + curLen + gap)) return@collect
+            first = false
             if (forced != null && order.isEmpty()) return@collect
             val next = if (forced == null && sinceScene == 0 && Math.random() < 0.55) {
                 Act.WANDER
@@ -173,7 +186,8 @@ fun PlumberStage(
             act.intValue = next.ordinal
             variant.intValue = (Math.random() * 3).toInt()
             start.floatValue = t
-            nextAt = t + next.length + if (forced != null) 1f else 3f + (Math.random() * 6).toFloat()
+            curLen = next.length
+            gap = if (forced != null) 1f else 3f + (Math.random() * 6).toFloat()
         }
     }
     // zvuky ve správných okamžicích
@@ -185,26 +199,46 @@ fun PlumberStage(
         val a = Act.entries[act.intValue]
         val loop = a == Act.TV || a == Act.SLEEP
         snapshotFlow { (clock.value - start.floatValue).let { if (loop && it >= 0f) it % a.length else it } }.collect { e ->
+            if (poke?.active(clock.value) == true) return@collect // zastavený = žádné zvuky scénky
             if (loop && e < prev) prev = -0.01f
             if (prev >= 0f || e < 0.2f) for ((at, s) in events) if (prev < at && e >= at) onSound(s)
             prev = e
         }
     }
+    // ťuknutí: zastavit scénku, otočit se, prohodit hlášku; pak pokračovat tam, kde přestal
+    if (poke != null) {
+        LaunchedEffect(poke.taps.intValue, animate) {
+            if (poke.taps.intValue == 0 || !animate || fixedAct != null) return@LaunchedEffect
+            val t0 = clock.value
+            val again = t0 - poke.at.floatValue < KutilPoke.LEN + 4f
+            if (!poke.active(t0)) poke.frozenE = t0 - start.floatValue
+            poke.streak = if (again) poke.streak + 1 else 0
+            poke.line = KutilPoke.lineFor(Act.entries[act.intValue], poke.streak)
+            poke.at.floatValue = t0
+            onSound(if (poke.streak >= 2) GagSound.BURP else GagSound.SIGH)
+            val until = t0 + KutilPoke.LEN
+            snapshotFlow { clock.value }.first { it >= until }
+            start.floatValue = clock.value - poke.frozenE
+        }
+    }
     val pipes = rememberPipeImages()
-    Canvas(modifier) {
+    Canvas(modifier.onGloballyPositioned { val o = it.positionInParent(); stageOrigin[0] = o.x; stageOrigin[1] = o.y }) {
         val t = clock.value
         val scripted = PlumberDebug.script?.invoke(t)
         if (PlumberDebug.script != null && scripted == null) return@Canvas
         val a = scripted?.first ?: fixedAct ?: Act.entries[act.intValue]
-        var e = scripted?.second ?: fixedElapsed ?: if (animate) t - start.floatValue else -1f
+        val poked = poke != null && poke.active(t)
+        var e = scripted?.second ?: fixedElapsed ?: if (!animate) -1f else if (poked) poke!!.frozenE else t - start.floatValue
         val looping = a == Act.TV || a == Act.SLEEP
         if (looping && e >= 0f) e %= a.length
         if (!animate && looping) e = 1f
-        if (e < 0f || e > a.length) return@Canvas
+        if (e < 0f || e > a.length) { poke?.bounds = null; return@Canvas }
         val u = 1.dp.toPx()
         val floorY = size.height - 10 * u
         // rekvizity se jemně objeví a zmizí
         val fade = if (looping) 1f else min(1f, min(e / 0.6f, (a.length - e) / 0.6f)).coerceIn(0f, 1f)
+        val w = size.width
+        smoother.override = if (poked) { p -> KutilPoke.react(p, w, poke!!.streak) } else null
         when (a) {
             Act.PIPE -> actPipe(e, t, floorY, u, fade, pipes, smoother)
             Act.TOILET -> drawToiletScene2(e, t, floorY, u, smoother)
@@ -222,6 +256,82 @@ fun PlumberStage(
             Act.END_SHIFT -> actEndShift(e, t, floorY, u, fade, pipes, smoother)
             Act.WANDER -> drawPlumber(smoother.smooth(poseWander(e, t, size.width, u, variant.intValue), t, e), floorY, u)
         }
+        val kp = smoother.last
+        if (poke != null && kp != null) {
+            // kde Kutil je (pro ťuknutí) – v souřadnicích rodiče
+            val top = floorY - 118 * u - kp.lift + kp.sit * 12 * u
+            poke.bounds = androidx.compose.ui.geometry.Rect(stageOrigin[0] + kp.x - 34 * u, stageOrigin[1] + top, stageOrigin[0] + kp.x + 34 * u, stageOrigin[1] + floorY - kp.lift + 6 * u)
+            if (poked) drawSpeech(textMeasurer, poke!!.line, kp, floorY, u, t - poke.at.floatValue)
+        }
+    }
+}
+
+/** Stav ťukání na Kutila (sdílí ho přehled s jevištěm). */
+class KutilPoke {
+    internal val taps = mutableIntStateOf(0)
+    internal val at = mutableFloatStateOf(-100f)
+    internal var frozenE = 0f
+    internal var streak = 0
+    internal var line = ""
+    /** Kde Kutil právě je (v souřadnicích rodičovského Boxu); null = není vidět. */
+    @Volatile var bounds: androidx.compose.ui.geometry.Rect? = null
+
+    fun tap() { taps.intValue++ }
+    internal fun active(t: Float) = t - at.floatValue < LEN
+
+    companion object {
+        const val LEN = 2.8f
+        private val work = listOf(
+            "Co po mně chceš?", "Nevidíš, že makám?", "Hm? Co je?", "Šéfe, já fakt pracuju!",
+            "Klid, mám to pod kontrolou.", "Neťukej, nebo to zase praskne!", "Co čumíš? Trubka teče!",
+        )
+        private val tv = listOf("Ruším? Hraje se hokej!", "Co je? Teď dávaj gól!", "Po šichtě mám klid, ne?", "Pivo si nedám vzít.")
+        private val sleep = listOf("Chrr… co?! Je noc!", "Nech mě spát…", "Zítra, zítra…")
+        private val angry = listOf("Zase ty?!", "No co pořád ťukáš?!", "Já ti ťuknu!", "Dost! Jdu si stěžovat!")
+
+        internal fun lineFor(a: Act, streak: Int): String = when {
+            streak >= 2 -> angry.random()
+            a == Act.SLEEP -> sleep.random()
+            a == Act.TV -> tv.random()
+            a == Act.END_SHIFT -> "Padla je padla!"
+            else -> work.random()
+        }
+
+        /** Póza „co po mně chceš?“: otočí se, rozhodí rukama, koukne na tebe. */
+        internal fun react(p: Pose, w: Float, streak: Int): Pose = p.copy(
+            facing = if (p.x < w / 2) 1f else -1f,
+            run = 0f, lean = 0f, tilt = 0f, dazed = 0f,
+            armR = if (p.carry == 3 || p.carry == 4) p.armR.coerceAtMost(80f) else 118f,
+            armL = -112f,
+            grin = if (streak >= 2) -0.9f else -0.25f,
+            wink = false, thumb = false, eyesClosed = false, zzz = false, plungerOnFace = false,
+            lookAtYou = true,
+        )
+    }
+}
+
+/** Bublina s hláškou nad Kutilovou hlavou (vyskočí a lehce se zhoupne). */
+private fun DrawScope.drawSpeech(tm: androidx.compose.ui.text.TextMeasurer, text: String, p: Pose, floorY: Float, u: Float, age: Float) {
+    if (text.isEmpty()) return
+    val pop = ez(sg(age, 0f, 0.18f)) * (1f - sg(age, KutilPoke.LEN - 0.25f, KutilPoke.LEN))
+    if (pop <= 0.01f) return
+    val style = androidx.compose.ui.text.TextStyle(color = Color(0xFF1B1B1B), fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+    val lay = tm.measure(text, style, constraints = androidx.compose.ui.unit.Constraints(maxWidth = (170 * u).toInt()))
+    val bw = lay.size.width + 18 * u
+    val bh = lay.size.height + 12 * u
+    val head = Offset(p.x + 4 * u * p.facing, floorY - 74 * u - p.lift + p.sit * 12 * u)
+    val bx = (head.x - bw / 2 + 14 * u * p.facing).coerceIn(6 * u, size.width - bw - 6 * u)
+    val by = head.y - 34 * u - bh - 3 * u * sin(age * 5f)
+    androidx.compose.ui.graphics.drawscope.scale(pop, pop, pivot = Offset(head.x, by + bh)) {
+        val tail = Path().apply {
+            val tx = head.x.coerceIn(bx + 12 * u, bx + bw - 12 * u)
+            moveTo(tx - 7 * u, by + bh - 1 * u); lineTo(head.x + 2 * u * p.facing, head.y - 22 * u); lineTo(tx + 6 * u, by + bh - 1 * u); close()
+        }
+        drawRoundRect(Outline, Offset(bx - 1.6f * u, by - 1.6f * u), Size(bw + 3.2f * u, bh + 3.2f * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(12 * u))
+        drawPath(tail, Outline, style = Stroke(3.2f * u, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+        drawRoundRect(Color.White, Offset(bx, by), Size(bw, bh), cornerRadius = androidx.compose.ui.geometry.CornerRadius(11 * u))
+        drawPath(tail, Color.White)
+        drawText(lay, topLeft = Offset(bx + 9 * u, by + 6 * u))
     }
 }
 

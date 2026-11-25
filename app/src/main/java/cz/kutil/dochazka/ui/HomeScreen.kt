@@ -42,6 +42,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -144,7 +148,30 @@ fun HomeScreen(
         WorkCalc.unionMinutes(list)
     }
 
-    Box(Modifier.fillMaxSize()) {
+    val kutilPoke = remember { KutilPoke() }
+    Box(
+        Modifier.fillMaxSize().pointerInput(gagOn, animate) {
+            if (!gagOn || !animate) return@pointerInput
+            // ťuknutí na Kutila: jen se dívá (předběžný průchod), posouvání a tlačítka fungují dál
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                val hit = kutilPoke.bounds?.contains(down.position) == true
+                if (!hit) return@awaitEachGesture
+                while (true) {
+                    val ev = awaitPointerEvent(PointerEventPass.Initial)
+                    val c = ev.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
+                    if ((c.position - down.position).getDistance() > viewConfiguration.touchSlop) return@awaitEachGesture
+                    if (!c.pressed) {
+                        if (c.uptimeMillis - down.uptimeMillis < 600) {
+                            c.consume() // ať se pod ním nezmáčkne tlačítko
+                            kutilPoke.tap()
+                        }
+                        return@awaitEachGesture
+                    }
+                }
+            }
+        },
+    ) {
     SidePipes(clock, water, animate)
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
@@ -388,6 +415,7 @@ fun HomeScreen(
             // pracuje jen během směny; po práci televize a pivo, od 20:00 do 6:00 spí
             working = open != null,
             night = Fmt.zoned(now).hour.let { it >= 20 || it < 6 },
+            poke = kutilPoke,
         )
     }
     }
