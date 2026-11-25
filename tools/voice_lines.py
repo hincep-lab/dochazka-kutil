@@ -1,3 +1,12 @@
+"""Kutilovy hlášky (res/raw/voice_*.ogg).
+
+AKTUÁLNÍ nahrávky jsou z hlasové služby Speko (poskytovatel Cartesia, model sonic-3.5,
+český mužský hlas „Jan“, id 82db1f84-5b96-4364-b04a-4c7ff80e2f8a), vygenerované jednorázově;
+aplikace je jen přehrává offline. Úprava: ořez ticha, loudnorm -16 LUFS, mono 22 kHz ogg.
+
+Níže je původní záložní varianta (volný model Coqui VITS cs, snížený o 5,5 půltónu),
+kdyby bylo potřeba hlášky přegenerovat bez internetových služeb.
+"""
 from TTS.api import TTS
 import numpy as np, soundfile, librosa, subprocess
 d='/tmp/tts/tts_models--cs--cv--vits/'
