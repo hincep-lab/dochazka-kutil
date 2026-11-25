@@ -171,10 +171,20 @@ fun SettingsScreen(vm: MainViewModel, state: UiState, onOpenDiag: () -> Unit) {
                     "Mluví jen v normálním režimu zvonění, ne v tichém, na vibracích, v režimu Nerušit ani v noci od 22 do 6 hodin.",
                 style = MaterialTheme.typography.bodySmall,
             )
-            if (talk) {
-                androidx.compose.material3.TextButton(onClick = {
-                    cz.kutil.dochazka.track.NotifyVoice.say(context, cz.kutil.dochazka.track.NotifyVoice.Line.START, 0)
-                }) { Text("Poslechnout ukázku") }
+            Row {
+                androidx.compose.material3.OutlinedButton(onClick = {
+                    val ok = cz.kutil.dochazka.track.Notifier.showTest(context)
+                    android.widget.Toast.makeText(
+                        context,
+                        if (ok) "Zkušební oznámení odesláno. ANO / NE nic nezapíše." else "Oznámení jsou vypnutá – povol je aplikaci v nastavení telefonu.",
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                }) { Text("Poslat zkušební oznámení") }
+                if (talk) {
+                    androidx.compose.material3.TextButton(onClick = {
+                        cz.kutil.dochazka.track.NotifyVoice.say(context, cz.kutil.dochazka.track.NotifyVoice.Line.START, 0)
+                    }) { Text("Jen hlas") }
+                }
             }
             var gag by remember { mutableStateOf(AppPrefs.plumberGag(context)) }
             Row(verticalAlignment = Alignment.CenterVertically) {
