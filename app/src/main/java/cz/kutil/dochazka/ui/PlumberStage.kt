@@ -137,6 +137,8 @@ fun PlumberStage(
     fixedElapsed: Float? = null,
     /** Ťuknutí na Kutila: zarazí se, podívá se na tebe a něco utrousí. */
     poke: KutilPoke? = null,
+    /** Přehraje namluvenou hlášku (název souboru v res/raw). */
+    onVoice: (String) -> Unit = {},
 ) {
     val act = remember { mutableIntStateOf(Act.WANDER.ordinal) }
     val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
@@ -214,9 +216,10 @@ fun PlumberStage(
             val again = t0 - poke.at.floatValue < KutilPoke.LEN + 4f
             if (!poke.active(t0)) poke.frozenE = t0 - start.floatValue
             poke.streak = if (again) poke.streak + 1 else 0
-            poke.line = KutilPoke.lineFor(Act.entries[act.intValue], poke.streak)
+            val (text, voice) = KutilPoke.lineFor(Act.entries[act.intValue], poke.streak)
+            poke.line = text
             poke.at.floatValue = t0
-            onSound(if (poke.streak >= 2) GagSound.BURP else GagSound.SIGH)
+            onVoice(voice)
             val until = t0 + KutilPoke.LEN
             snapshotFlow { clock.value }.first { it >= until }
             start.floatValue = clock.value - poke.frozenE
@@ -282,20 +285,34 @@ class KutilPoke {
 
     companion object {
         const val LEN = 2.8f
+        // hláška a k ní namluvený zvuk (res/raw/voice_*.ogg, tools/voice_lines.py)
         private val work = listOf(
-            "Co po mně chceš?", "Nevidíš, že makám?", "Hm? Co je?", "Šéfe, já fakt pracuju!",
-            "Klid, mám to pod kontrolou.", "Neťukej, nebo to zase praskne!", "Co čumíš? Trubka teče!",
+            "Co po mně chceš?" to "voice_w1", "Nevidíš, že makám?" to "voice_w2", "Hm? Co je?" to "voice_w3",
+            "Šéfe, já fakt pracuju!" to "voice_w4", "Klid, mám to pod kontrolou." to "voice_w5",
+            "Neťukej, nebo to zase praskne!" to "voice_w6", "Co čumíš? Trubka teče!" to "voice_w7",
         )
-        private val tv = listOf("Ruším? Hraje se hokej!", "Co je? Teď dávaj gól!", "Po šichtě mám klid, ne?", "Pivo si nedám vzít.")
-        private val sleep = listOf("Chrr… co?! Je noc!", "Nech mě spát…", "Zítra, zítra…")
-        private val angry = listOf("Zase ty?!", "No co pořád ťukáš?!", "Já ti ťuknu!", "Dost! Jdu si stěžovat!")
+        private val tv = listOf(
+            "Ruším? Hraje se hokej!" to "voice_t1", "Co je? Teď dávaj gól!" to "voice_t2",
+            "Po šichtě mám klid, ne?" to "voice_t3", "Pivo si nedám vzít." to "voice_t4",
+        )
+        private val sleep = listOf("Chrr… co?! Je noc!" to "voice_s1", "Nech mě spát…" to "voice_s2", "Zítra, zítra…" to "voice_s3")
+        private val angry = listOf(
+            "Zase ty?!" to "voice_a1", "No co pořád ťukáš?!" to "voice_a2", "Já ti ťuknu!" to "voice_a3", "Dost! Jdu si stěžovat!" to "voice_a4",
+        )
+        private var lastLine = ""
 
-        internal fun lineFor(a: Act, streak: Int): String = when {
-            streak >= 2 -> angry.random()
-            a == Act.SLEEP -> sleep.random()
-            a == Act.TV -> tv.random()
-            a == Act.END_SHIFT -> "Padla je padla!"
-            else -> work.random()
+        /** Vybere hlášku (ne stejnou dvakrát po sobě): text a název zvuku. */
+        internal fun lineFor(a: Act, streak: Int): Pair<String, String> {
+            val pool = when {
+                streak >= 2 -> angry
+                a == Act.SLEEP -> sleep
+                a == Act.TV -> tv
+                a == Act.END_SHIFT -> listOf("Padla je padla!" to "voice_e1")
+                else -> work
+            }
+            val pick = pool.filter { it.first != lastLine }.ifEmpty { pool }.random()
+            lastLine = pick.first
+            return pick
         }
 
         /** Póza „co po mně chceš?“: otočí se, rozhodí rukama, koukne na tebe. */

@@ -33,7 +33,7 @@ object SoundTap {
 class WaterSounds(ctx: Context) {
     private val audio = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val pool = SoundPool.Builder()
-        .setMaxStreams(4)
+        .setMaxStreams(5)
         .setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
@@ -70,6 +70,29 @@ class WaterSounds(ctx: Context) {
         GagSound.METAL_FALL to (pool.load(ctx, R.raw.gag_metal_fall, 1) to 0.16f),
         GagSound.TOOL_DROP to (pool.load(ctx, R.raw.gag_tool_drop, 1) to 0.2f),
     )
+    /** Namluvené Kutilovy hlášky (res/raw/voice_*.ogg), načtené dopředu. */
+    private val voices: Map<String, Int> = mapOf(
+        "voice_w1" to pool.load(ctx, R.raw.voice_w1, 1),
+        "voice_w2" to pool.load(ctx, R.raw.voice_w2, 1),
+        "voice_w3" to pool.load(ctx, R.raw.voice_w3, 1),
+        "voice_w4" to pool.load(ctx, R.raw.voice_w4, 1),
+        "voice_w5" to pool.load(ctx, R.raw.voice_w5, 1),
+        "voice_w6" to pool.load(ctx, R.raw.voice_w6, 1),
+        "voice_w7" to pool.load(ctx, R.raw.voice_w7, 1),
+        "voice_t1" to pool.load(ctx, R.raw.voice_t1, 1),
+        "voice_t2" to pool.load(ctx, R.raw.voice_t2, 1),
+        "voice_t3" to pool.load(ctx, R.raw.voice_t3, 1),
+        "voice_t4" to pool.load(ctx, R.raw.voice_t4, 1),
+        "voice_s1" to pool.load(ctx, R.raw.voice_s1, 1),
+        "voice_s2" to pool.load(ctx, R.raw.voice_s2, 1),
+        "voice_s3" to pool.load(ctx, R.raw.voice_s3, 1),
+        "voice_a1" to pool.load(ctx, R.raw.voice_a1, 1),
+        "voice_a2" to pool.load(ctx, R.raw.voice_a2, 1),
+        "voice_a3" to pool.load(ctx, R.raw.voice_a3, 1),
+        "voice_a4" to pool.load(ctx, R.raw.voice_a4, 1),
+        "voice_e1" to pool.load(ctx, R.raw.voice_e1, 1),
+    )
+    private var voiceStream = 0
     private var overflowStream = 0
     private var pourStream = 0
     private var sprayStream = 0
@@ -89,6 +112,15 @@ class WaterSounds(ctx: Context) {
                 pool.play(id, vol, vol, 1, 0, rate)
             }
         }
+    }
+
+    /** Kutilova hláška po ťuknutí (hlasitěji než ostatní zvuky, ať je rozumět). */
+    fun voice(name: String) {
+        SoundTap.listener?.invoke("VOICE_$name")
+        if (!allowed()) return
+        val id = voices[name] ?: return
+        if (voiceStream != 0) pool.stop(voiceStream)
+        voiceStream = pool.play(id, 0.6f, 0.6f, 2, 0, 1f)
     }
 
     private fun stopSpray() {

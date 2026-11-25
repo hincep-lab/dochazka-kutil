@@ -416,6 +416,7 @@ fun HomeScreen(
             working = open != null,
             night = Fmt.zoned(now).hour.let { it >= 20 || it < 6 },
             poke = kutilPoke,
+            onVoice = { sounds?.voice(it) },
         )
     }
     }
