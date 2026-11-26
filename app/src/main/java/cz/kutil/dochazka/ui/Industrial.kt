@@ -269,6 +269,10 @@ private val SteelGloss = Brush.verticalGradient(
 )
 private val SteelEdge = Brush.verticalGradient(listOf(Color.White, Color(0xFFB4BFCC), Color(0xFF7E8C9E)))
 
+/**
+ * Moderní světlá karta: hladká, jemný stín a tenký okraj, velké zaoblení.
+ * (Dřív kartáčovaný kov se šroubky – název zůstal kvůli ostatním obrazovkám.)
+ */
 @Composable
 fun SteelCard(
     modifier: Modifier = Modifier,
@@ -277,27 +281,20 @@ fun SteelCard(
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val tex = brushedBrush()
+    val shape = RoundedCornerShape(24.dp)
     Box(
         modifier
             .fillMaxWidth()
-            .shadow(10.dp, CardShape, ambientColor = Color.Black, spotColor = Color.Black)
-            .clip(CardShape)
-            .background(tex)
-            .background(SteelGloss)
-            .border(1.5.dp, SteelEdge, CardShape)
+            .shadow(6.dp, shape, ambientColor = Color(0xFF020814), spotColor = Color(0xFF020814))
+            .clip(shape)
+            .background(Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFF1F4F9))))
+            .border(1.dp, Color(0xFFE2E8F0), shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
-        if (screws) {
-            val sz = 11.dp
-            for (a in listOf(Alignment.TopStart, Alignment.TopEnd, Alignment.BottomStart, Alignment.BottomEnd)) {
-                Image(painterResource(R.drawable.screw), null, Modifier.align(a).padding(7.dp).size(sz))
-            }
-        }
         OnSteel {
             Column(
-                Modifier.padding(horizontal = if (screws) padding + 4.dp else padding, vertical = padding),
-                verticalArrangement = Arrangement.spacedBy(7.dp),
+                Modifier.padding(horizontal = padding + 4.dp, vertical = padding + 2.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 content = content,
             )
         }
@@ -317,7 +314,7 @@ fun SectionTitle(text: String, icon: ImageVector? = null, @DrawableRes iconRes: 
             icon != null -> Icon(icon, null, tint = Ind.orangeDeep, modifier = Modifier.size(22.dp))
         }
         if (icon != null || iconRes != null) Spacer(Modifier.width(8.dp))
-        Text(text, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = LocalContentColor.current, modifier = Modifier.weight(1f), maxLines = 2)
+        Text(text, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.1.sp, color = LocalContentColor.current, modifier = Modifier.weight(1f), maxLines = 2)
         trailing?.invoke()
     }
 }
@@ -376,16 +373,17 @@ fun StatusPanel(tone: PanelTone, modifier: Modifier = Modifier, content: @Compos
 
 enum class ActionKind { GO, STOP, ACCENT, METAL, GLASS }
 
-private class BtnStyle(val top: Color, val mid: Color, val bottom: Color, val edge: Color, val text: Color)
+private class BtnStyle(val from: Color, val to: Color, val glow: Color, val text: Color)
 
 private fun btn(kind: ActionKind) = when (kind) {
-    ActionKind.GO -> BtnStyle(Color(0xFF5CC85A), Color(0xFF2E9A35), Color(0xFF1C7426), Color(0xFF125018), Color.White)
-    ActionKind.STOP -> BtnStyle(Color(0xFFF2564B), Color(0xFFD72A20), Color(0xFFA8180F), Color(0xFF6E0D07), Color.White)
-    ActionKind.ACCENT -> BtnStyle(Color(0xFFFFB648), Color(0xFFF08C12), Color(0xFFC46A04), Color(0xFF7A4100), Color(0xFF1F1200))
-    ActionKind.GLASS -> BtnStyle(Color(0xFF4C94E8), Color(0xFF1F62B8), Color(0xFF15488C), Color(0xFF0B2D5C), Color.White)
-    ActionKind.METAL -> BtnStyle(Color(0xFFF2F7FF), Color(0xFFD5E4F9), Color(0xFFB4CDEE), Color(0xFF7B9CC8), Color(0xFF0E2547))
+    ActionKind.GO -> BtnStyle(Color(0xFF2FD47F), Color(0xFF11A35E), Color(0xFF13C070), Color.White)
+    ActionKind.STOP -> BtnStyle(Color(0xFFFF6B5E), Color(0xFFE02F3A), Color(0xFFFF4B4B), Color.White)
+    ActionKind.ACCENT -> BtnStyle(Color(0xFFFFC15A), Color(0xFFF59A16), Color(0xFFFFB340), Color(0xFF1F1200))
+    ActionKind.GLASS -> BtnStyle(Color(0x33FFFFFF), Color(0x1FFFFFFF), Color.Transparent, Color.White)
+    ActionKind.METAL -> BtnStyle(Color(0xFFF4F7FB), Color(0xFFE4EAF2), Color.Transparent, Color(0xFF0E2547))
 }
 
+/** Moderní tlačítko: plynulý přechod barvy, barevná záře, při stisku se mírně zmenší. */
 @Composable
 fun BigActionButton(
     text: String,
@@ -402,46 +400,48 @@ fun BigActionButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.97f else 1f, tween(120), label = "press")
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(if (height >= 56.dp) 20.dp else 16.dp)
+    val glass = kind == ActionKind.GLASS
     Box(
         modifier
             .heightIn(min = height)
             .scale(scale)
-            .shadow(if (pressed) 2.dp else 7.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
+            .then(
+                if (st.glow != Color.Transparent) Modifier.shadow(if (pressed) 2.dp else 10.dp, shape, ambientColor = st.glow, spotColor = st.glow)
+                else Modifier,
+            )
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(st.top, st.mid, st.bottom)))
-            .border(1.5.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.75f), st.edge)), shape)
+            .background(Brush.linearGradient(listOf(st.from, st.to)))
+            .then(if (glass) Modifier.border(1.dp, Color.White.copy(alpha = 0.22f), shape) else Modifier)
             .clickable(interactionSource = interaction, indication = ripple(color = Color.White), enabled = enabled, onClick = onClick)
             .semantics { role = Role.Button }
             .then(if (enabled) Modifier else Modifier.background(Color(0x88000000))),
         contentAlignment = Alignment.Center,
     ) {
-        // lesk v horní polovině
-        Box(Modifier.matchParentSize().background(Brush.verticalGradient(0f to Color.White.copy(alpha = 0.30f), 0.5f to Color.White.copy(alpha = 0.04f), 0.51f to Color.Transparent)))
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
             when {
                 leading != null -> {
                     leading()
                     Spacer(Modifier.width(12.dp))
                 }
                 iconRes != null -> {
-                    Icon(painterResource(iconRes), null, tint = st.text, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(7.dp))
+                    Icon(painterResource(iconRes), null, tint = st.text, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
                 }
                 icon != null -> {
-                    Icon(icon, null, tint = st.text, modifier = Modifier.size(24.dp))
+                    Icon(icon, null, tint = st.text, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(8.dp))
                 }
             }
             Text(
                 text,
                 color = st.text,
-                fontSize = if (height >= 56.dp) shrink(21f) else shrink(16f),
-                fontWeight = FontWeight.ExtraBold,
+                fontSize = if (height >= 56.dp) shrink(20f) else shrink(15.5f),
+                fontWeight = if (height >= 56.dp) FontWeight.ExtraBold else FontWeight.Bold,
+                letterSpacing = if (height >= 56.dp) 0.2.sp else 0.sp,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = if (kind == ActionKind.METAL || kind == ActionKind.ACCENT) TextStyle.Default else PanelText,
             )
         }
     }
@@ -450,39 +450,42 @@ fun BigActionButton(
 /** Bílé kolečko s červeným čtverečkem (stop) – jako na předloze. */
 @Composable
 fun StopGlyph() {
-    Box(Modifier.size(30.dp).shadow(3.dp, CircleShape).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(12.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFFD72A20)))
+    Box(Modifier.size(30.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.95f)), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(11.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFFE02F3A)))
     }
 }
 
 @Composable
 fun PlayGlyph() {
-    Box(Modifier.size(30.dp).shadow(3.dp, CircleShape).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-        Icon(painterResource(R.drawable.ic_play_arrow), null, tint = Color(0xFF2E9A35), modifier = Modifier.size(24.dp))
+    Box(Modifier.size(30.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.95f)), contentAlignment = Alignment.Center) {
+        Icon(painterResource(R.drawable.ic_play_arrow), null, tint = Color(0xFF11A35E), modifier = Modifier.size(22.dp))
     }
 }
 
-/** Dlaždice rychlé akce – všechny stejným stylem (ocelově modrá ikona, tmavý popisek). */
+/** Dlaždice rychlé akce: průhledná skleněná plocha, ikona v barevném kolečku, popisek pod ní. */
 @Composable
 fun QuickTile(text: String, @DrawableRes iconRes: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(14.dp)
-    val tint = Color(0xFF1F4E8C)
+    val shape = RoundedCornerShape(20.dp)
     Column(
         modifier
-            .heightIn(min = 76.dp)
-            .shadow(4.dp, shape)
+            .heightIn(min = 84.dp)
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(Color(0xFFFBFCFE), Color(0xFFDCE3EC))))
-            .border(1.dp, Color(0xFF9AA8BA), shape)
+            .background(Color.White.copy(alpha = 0.07f))
+            .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
             .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 8.dp),
+            .padding(horizontal = 4.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(painterResource(iconRes), null, tint = tint, modifier = Modifier.size(28.dp))
-        Spacer(Modifier.height(3.dp))
+        Box(
+            Modifier.size(40.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF5AA9FF), Color(0xFF2F6FE0)))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(painterResource(iconRes), null, tint = Color.White, modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.height(6.dp))
         val narrow = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 390
-        Text(text, fontSize = if (narrow) shrink(11.5f) else shrink(13f), lineHeight = if (narrow) shrink(13.5f) else shrink(15f), softWrap = true, fontWeight = FontWeight.Bold, color = Ind.text, textAlign = TextAlign.Center, maxLines = 2)
+        Text(text, fontSize = if (narrow) shrink(11.5f) else shrink(12.5f), lineHeight = if (narrow) shrink(13.5f) else shrink(14.5f), softWrap = true, fontWeight = FontWeight.SemiBold, color = Color.White, textAlign = TextAlign.Center, maxLines = 2)
     }
 }
 

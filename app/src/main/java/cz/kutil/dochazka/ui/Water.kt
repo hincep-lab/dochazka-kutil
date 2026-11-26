@@ -562,19 +562,19 @@ fun PulseIndicator(color: Color, clock: State<Float>, animate: Boolean, modifier
 
 @Composable
 fun GlassCard(modifier: Modifier = Modifier, padding: Dp = 12.dp, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
-    val shape = RoundedCornerShape(20.dp)
+    // moderní „matné sklo“: tmavá poloprůhledná plocha, vlasový okraj, velké zaoblení
+    val shape = RoundedCornerShape(24.dp)
     Box(
         modifier
             .fillMaxWidth()
-            .shadow(10.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
+            .shadow(8.dp, shape, ambientColor = Color(0xFF01060F), spotColor = Color(0xFF01060F))
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(Color(0xE0234A7C), Color(0xE8122A4C))))
-            .border(1.2.dp, Brush.verticalGradient(listOf(Color(0xCCBFE3FF), Color(0x4482B8F0))), shape)
+            .background(Brush.verticalGradient(listOf(Color(0xD9162B47), Color(0xE60D1B30))))
+            .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
-        Box(Modifier.fillMaxWidth().height(28.dp).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.12f), Color.Transparent))))
         CompositionLocalProvider(LocalContentColor provides Color.White) {
-            Column(Modifier.padding(padding), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(7.dp), content = content)
+            Column(Modifier.padding(horizontal = padding + 4.dp, vertical = padding + 2.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp), content = content)
         }
     }
 }

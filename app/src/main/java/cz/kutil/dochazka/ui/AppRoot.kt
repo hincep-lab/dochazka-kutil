@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.sp
@@ -289,9 +290,19 @@ private fun IndTopBar(title: String, subtitle: String, onBack: () -> Unit, trail
 
 @Composable
 private fun IndBottomBar(selected: Tab?, pendingCount: Int, onSelect: (Tab) -> Unit) {
-    Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xF2132A4A), Color(0xFF07111F))))) {
-        Box(Modifier.fillMaxWidth().height(2.dp).background(Brush.horizontalGradient(listOf(Color(0xFF5E6F86), Color(0xFFDCE4EE), Color(0xFF5E6F86)))))
-        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 6.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    // plovoucí lišta ve tvaru tablety; vybraná položka má světlé „pilulkové“ pozadí
+    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 12.dp, end = 12.dp, bottom = 8.dp, top = 4.dp)) {
+        val bar = RoundedCornerShape(28.dp)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .shadow(16.dp, bar, ambientColor = Color.Black, spotColor = Color.Black)
+                .clip(bar)
+                .background(Color(0xF20B1626))
+                .border(1.dp, Color.White.copy(alpha = 0.09f), bar)
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             for (t in Tab.entries) {
                 val sel = t == selected
                 val icon = when (t) {
@@ -301,28 +312,26 @@ private fun IndBottomBar(selected: Tab?, pendingCount: Int, onSelect: (Tab) -> U
                     Tab.PENDING -> AppIcons.CONFIRM
                     Tab.SETTINGS -> AppIcons.MORE
                 }
-                val shape = RoundedCornerShape(14.dp)
+                val shape = RoundedCornerShape(22.dp)
+                val bg by androidx.compose.animation.animateColorAsState(if (sel) Color(0xFF2F6FE0) else Color.Transparent, label = "tabBg")
                 Column(
                     Modifier
                         .weight(1f)
                         .clip(shape)
-                        .background(
-                            if (sel) Brush.verticalGradient(listOf(Color(0xFF4E8DF0), Color(0xFF1F5FCC))) else Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent)),
-                        )
-                        .then(if (sel) Modifier.border(1.dp, Color(0xFF9FC5FF), shape) else Modifier)
+                        .background(bg)
                         .clickable { onSelect(t) }
-                        .padding(vertical = 7.dp),
+                        .padding(vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    val tint = if (sel) Color.White else Ind.onBgDim
+                    val tint = if (sel) Color.White else Color(0xFF9DB0C8)
                     if (t == Tab.PENDING && pendingCount > 0) {
                         BadgedBox(badge = { Badge(containerColor = Ind.red, contentColor = Color.White) { Text(pendingCount.toString()) } }) {
-                            Icon(painterResource(icon), contentDescription = t.label, tint = tint, modifier = Modifier.size(26.dp))
+                            Icon(painterResource(icon), contentDescription = t.label, tint = tint, modifier = Modifier.size(24.dp))
                         }
                     } else {
-                        Icon(painterResource(icon), contentDescription = t.label, tint = tint, modifier = Modifier.size(26.dp))
+                        Icon(painterResource(icon), contentDescription = t.label, tint = tint, modifier = Modifier.size(24.dp))
                     }
-                    Text(t.label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = tint, maxLines = 1)
+                    Text(t.label, fontSize = 11.5.sp, fontWeight = if (sel) FontWeight.ExtraBold else FontWeight.SemiBold, color = tint, maxLines = 1)
                 }
             }
         }

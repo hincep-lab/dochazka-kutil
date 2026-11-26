@@ -121,16 +121,36 @@ val CardScheme = lightColorScheme(
     outlineVariant = Color(0xFFB7C1CE),
 )
 
+/** Moderní písmo Manrope (Google Fonts, licence OFL – tools/fonts/Manrope-OFL.txt), přibalené v aplikaci. */
+val Manrope = androidx.compose.ui.text.font.FontFamily(
+    androidx.compose.ui.text.font.Font(cz.kutil.dochazka.R.font.manrope_regular, FontWeight.Normal),
+    androidx.compose.ui.text.font.Font(cz.kutil.dochazka.R.font.manrope_medium, FontWeight.Medium),
+    androidx.compose.ui.text.font.Font(cz.kutil.dochazka.R.font.manrope_semibold, FontWeight.SemiBold),
+    androidx.compose.ui.text.font.Font(cz.kutil.dochazka.R.font.manrope_bold, FontWeight.Bold),
+    androidx.compose.ui.text.font.Font(cz.kutil.dochazka.R.font.manrope_extrabold, FontWeight.ExtraBold),
+    androidx.compose.ui.text.font.Font(cz.kutil.dochazka.R.font.manrope_extrabold, FontWeight.Black),
+)
+
 private val Type = Typography().let { t ->
+    fun TextStyle.m() = copy(fontFamily = Manrope)
     t.copy(
-        headlineMedium = t.headlineMedium.copy(fontWeight = FontWeight.Bold),
-        titleLarge = t.titleLarge.copy(fontWeight = FontWeight.Bold),
-        titleMedium = t.titleMedium.copy(fontWeight = FontWeight.Bold),
-        labelLarge = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Bold),
+        displayLarge = t.displayLarge.m(), displayMedium = t.displayMedium.m(), displaySmall = t.displaySmall.m(),
+        headlineLarge = t.headlineLarge.m().copy(fontWeight = FontWeight.ExtraBold),
+        headlineMedium = t.headlineMedium.m().copy(fontWeight = FontWeight.ExtraBold),
+        headlineSmall = t.headlineSmall.m().copy(fontWeight = FontWeight.Bold),
+        titleLarge = t.titleLarge.m().copy(fontWeight = FontWeight.ExtraBold),
+        titleMedium = t.titleMedium.m().copy(fontWeight = FontWeight.Bold),
+        titleSmall = t.titleSmall.m().copy(fontWeight = FontWeight.Bold),
+        bodyLarge = t.bodyLarge.m(), bodyMedium = t.bodyMedium.m(), bodySmall = t.bodySmall.m(),
+        labelLarge = TextStyle(fontFamily = Manrope, fontSize = 15.sp, fontWeight = FontWeight.Bold),
+        labelMedium = t.labelMedium.m(), labelSmall = t.labelSmall.m(),
     )
 }
 
 @Composable
 fun DochazkaTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = Scheme, typography = Type, content = content)
+    MaterialTheme(colorScheme = Scheme, typography = Type) {
+        // i texty bez vlastního stylu dostanou moderní písmo
+        androidx.compose.material3.ProvideTextStyle(Type.bodyLarge, content)
+    }
 }
