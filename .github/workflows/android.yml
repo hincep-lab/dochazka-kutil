@@ -38,15 +38,15 @@ jobs:
       - name: Unit testy
         run: ./gradlew testDebugUnitTest --stacktrace
 
-      - name: Sestavení debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Sestavení APK (release, bez ladicího režimu)
+        run: ./gradlew assembleRelease --stacktrace
 
       - name: Pojmenovat APK
         run: |
           mkdir -p out
           V=$(grep -oP 'val appVersion = "\K[^"]+' app/build.gradle.kts)
           echo "APP_VERSION=$V" >> "$GITHUB_ENV"
-          cp app/build/outputs/apk/debug/app-debug.apk "out/DochazkaKutil-v${V}-${{ github.run_number }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "out/DochazkaKutil-v${V}-${{ github.run_number }}.apk"
           ls -la out
 
       - name: Podpis novým klíčem (rotace z veřejného klíče)

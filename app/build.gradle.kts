@@ -38,6 +38,13 @@ android {
         debug {
             signingConfig = signingConfigs.getByName("debug")
         }
+        // Vydávané APK: ne „debuggable“ (Play Protect takové sideloadované aplikace podezírá),
+        // podepsané stejným klíčem jako dosud, aby aktualizace prošla bez odinstalace.
+        release {
+            isDebuggable = false
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 
     buildFeatures { compose = true }
