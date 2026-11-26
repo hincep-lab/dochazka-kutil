@@ -29,11 +29,11 @@ object Notifier {
     const val EXTRA_PENDING_ID = "pending_id"
     const val EXTRA_YES = "yes"
     const val EXTRA_OPEN_TAB = "open_tab"
-    const val CHANNEL_DONE = "answer_done"
+    const val CHANNEL_DONE = "answer_done_watch"
     /** Oranžová firemní barva (ikona a tlačítka oznámení). */
     private const val ACCENT = 0xFFF59E1B.toInt()
     const val CHANNEL_STATUS = "work_status"
-    const val CHANNEL_BACKUP = "backups"
+    const val CHANNEL_BACKUP = "backups_watch"
     const val BACKUP_DONE_ID = 507
     const val BACKUP_FAIL_ID = 508
     private const val STATUS_ID = 505
@@ -124,11 +124,10 @@ object Notifier {
             .setSmallIcon(R.drawable.ic_notif)
             .setContentTitle(title)
             .setContentText(text)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setSilent(true)
             .setAutoCancel(true)
-            .setTimeoutAfter(15_000)
+            .setTimeoutAfter(60_000)
             .setContentIntent(open)
         if (notifySafe(ctx, DONE_ID, builder)) when (title) {
             "Začátek práce zapsán" -> NotifyVoice.say(ctx, NotifyVoice.Line.STARTED, 150)
@@ -153,15 +152,23 @@ object Notifier {
         val monthly = NotificationChannel(CHANNEL_MONTHLY, "Měsíční uzávěrka", NotificationManager.IMPORTANCE_DEFAULT)
         monthly.description = "Připomenutí prvního dne v měsíci: zkontrolovat a odeslat docházku za minulý měsíc."
         nm.createNotificationChannel(monthly)
-        val done = NotificationChannel(CHANNEL_DONE, "Potvrzení zápisu", NotificationManager.IMPORTANCE_LOW)
-        done.description = "Krátká potvrzení po odpovědi ANO / NE přímo v oznámení."
+        // Potvrzení a zálohy: bez zvuku v telefonu, ale s krátkým zavibrováním – jen taková oznámení
+        // hodinky (Galaxy Watch) přeposílají; tichá (IMPORTANCE_LOW) na hodinky nedorazí.
+        nm.deleteNotificationChannel("answer_done")
+        nm.deleteNotificationChannel("backups")
+        val done = NotificationChannel(CHANNEL_DONE, "Potvrzení zápisu", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            setSound(null, null); enableVibration(true); vibrationPattern = longArrayOf(0, 120)
+        }
+        done.description = "Krátká potvrzení po odpovědi ANO / NE (bez zvuku, krátce zavibruje, přijde i na hodinky)."
         nm.createNotificationChannel(done)
         val status = NotificationChannel(CHANNEL_STATUS, "Stav práce", NotificationManager.IMPORTANCE_LOW)
         status.description = "Trvalé oznámení „V práci od …“, dokud běží směna."
         status.lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
         nm.createNotificationChannel(status)
-        val backups = NotificationChannel(CHANNEL_BACKUP, "Zálohy", NotificationManager.IMPORTANCE_LOW)
-        backups.description = "Potvrzení „Záloha provedena“ po každé uložené záloze."
+        val backups = NotificationChannel(CHANNEL_BACKUP, "Zálohy", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            setSound(null, null); enableVibration(true); vibrationPattern = longArrayOf(0, 120, 80, 120)
+        }
+        backups.description = "Potvrzení „Záloha provedena“ po každé uložené záloze (bez zvuku, zavibruje, přijde i na hodinky)."
         nm.createNotificationChannel(backups)
     }
 
@@ -184,7 +191,7 @@ object Notifier {
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setColor(0xFF22C493.toInt())
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(open)
         return notifySafe(ctx, BACKUP_DONE_ID, builder).also { if (it) NotifyVoice.say(ctx, NotifyVoice.Line.BACKUP_OK, 200) }
