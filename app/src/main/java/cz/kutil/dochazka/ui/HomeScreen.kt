@@ -209,7 +209,7 @@ fun HomeScreen(
                 val over = worked > 8 * 3_600_000L
                 WaterPanel(
                     GlassTone.WORKING, clock, water, worked / (8f * 3_600_000f), animate, drip = dripSync,
-                    modifier = Modifier.onGloballyPositioned { panelBounds.rect = it.boundsInRoot() },
+                    modifier = Modifier.onGloballyPositioned { panelBounds.rect = it.unclippedBoundsInRoot() },
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(R.drawable.ic_engineering), null, tint = Color.White, modifier = Modifier.size(if (big) 26.dp else 32.dp))

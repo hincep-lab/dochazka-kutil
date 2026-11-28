@@ -608,22 +608,26 @@ fun OverflowOverlay(
         // vpusť je na konci stránky: když není vidět, voda stéká pod spodní okraj obrazovky
         val dr = drainAt?.rect
         val drain = if (dr != null) Offset(dr.center.x - origin.x, dr.center.y - origin.y) else Offset(size.width / 2, size.height + 60 * u)
-        val startY = r.bottom.coerceIn(0f, size.height * 0.8f)
+        val startY = r.bottom.coerceIn(0f, size.height)
+        // vpusť nad začátkem pramínku (nemělo by nastat) = jako by nebyla vidět: voda teče jen dolů
+        val drainBelow = drain.y > startY + 40 * u
         val water = Color(0xFF6CC4FF)
         // pramínky: od rohů nádoby dolů a pak do vpusti (jen při přesčasu)
         if (!drainOnly && k > 0.01f) for ((i, x0) in listOf(r.left + 6 * u, r.right - 6 * u).withIndex()) {
             if (i == 2 && k < 0.6f) continue
-            val bottom = min(size.height + 40 * u, drain.y - 24 * u) - i * 6 * u
+            val bottom = (if (drainBelow) min(size.height + 40 * u, drain.y - 24 * u) else size.height + 40 * u) - i * 6 * u
             val path = Path().apply {
                 moveTo(x0, startY)
-                // lehké vlnění pramínku
+                // lehké vlnění pramínku, vždy jen směrem dolů
                 var y = startY
                 while (y < bottom) {
                     y += 24 * u
                     lineTo(x0 + 2.2f * u * sin(y / (31 * u) + t * 2.5f + i), min(y, bottom))
                 }
-                quadraticTo(x0, drain.y - 4 * u, (x0 + drain.x) / 2, drain.y - 2 * u)
-                quadraticTo(drain.x + (x0 - drain.x) * 0.15f, drain.y, drain.x, drain.y)
+                if (drainBelow && drain.y < size.height + 40 * u) {
+                    quadraticTo(x0, drain.y - 4 * u, (x0 + drain.x) / 2, drain.y - 2 * u)
+                    quadraticTo(drain.x + (x0 - drain.x) * 0.15f, drain.y, drain.x, drain.y)
+                }
             }
             val wdt = (if (i == 2) 3.5f else 5f) * u * k
             drawPath(path, water.copy(alpha = 0.40f * k), style = Stroke(wdt * 1.8f, cap = StrokeCap.Round))
@@ -671,7 +675,7 @@ fun OverflowOverlay(
 fun DrainFloor(clock: State<Float>, overflowing: Boolean, animate: Boolean, bounds: PanelBounds, modifier: Modifier = Modifier) {
     val k by animateFloatAsState(if (overflowing) 1f else 0f, tween(if (animate) 2200 else 0), label = "drainWater")
     val grate = ImageBitmap.imageResource(R.drawable.g_odtokova_mrizka)
-    Canvas(modifier.fillMaxWidth().height(90.dp).onGloballyPositioned { bounds.rect = it.boundsInRoot() }) {
+    Canvas(modifier.fillMaxWidth().height(90.dp).onGloballyPositioned { bounds.rect = it.unclippedBoundsInRoot() }) {
         val u = density
         val t = if (animate) clock.value else 0f
         val c = Offset(size.width / 2, size.height / 2)
@@ -695,4 +699,11 @@ fun DrainFloor(clock: State<Float>, overflowing: Boolean, animate: Boolean, boun
             dstSize = androidx.compose.ui.unit.IntSize(gw.toInt(), gh.toInt()),
         )
     }
+}
+
+
+/** Poloha a velikost bez oříznutí obrazovkou (boundsInRoot by u prvku mimo obraz vrátil nesmyslný bod nahoře). */
+internal fun androidx.compose.ui.layout.LayoutCoordinates.unclippedBoundsInRoot(): Rect {
+    val p = positionInRoot()
+    return Rect(p.x, p.y, p.x + size.width, p.y + size.height)
 }
